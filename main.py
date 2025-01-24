@@ -1,4 +1,3 @@
-
 import os
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException
@@ -20,6 +19,9 @@ from datetime import datetime, timedelta
 from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from uuid import uuid4
+from datetime import datetime
+import logging
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -33,6 +35,8 @@ if not groq_api_key:
 # In-memory storage
 conversation_states = {}
 chat_history = []
+chat_sessions = {}
+
 last_responses = {}  # New dictionary to store the last response for each user
 
 app = FastAPI()
@@ -64,6 +68,20 @@ system_prompt = (
     'question to gather more information from the user, and stop responding questions after giving the final response. Do not provide direct answers, but instead ask follow-up questions '
     'to help the user refine their input. Remember to stay focused on educational topics and assist the user in creating '
     'tailored prompts for their needs. Avoid asking more than 7 questions before generating the final response. Provide the final answer after gathered the minimum details and make sure to provide all the answers as well for the assignments, quizzes or rubrics.'
+)
+
+# Initialize conversation chain
+conversation = LLMChain(
+    llm=groq_chat,
+    prompt=ChatPromptTemplate.from_messages(
+        [
+            SystemMessage(content=system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            HumanMessagePromptTemplate.from_template("{human_input}"),
+        ]
+    ),
+    verbose=False,
+    memory=memory,
 )
 
 # Create a directory for storing Word documents
@@ -130,54 +148,75 @@ async def chat(query: Query):
 
     try:
         # Retrieve or initialize conversation state
-        state = conversation_states.get(user_id, {
-            "user_id": user_id,
-            "conversation_turns": 0,
-            "conversation_data": []
-        })
+        if user_id not in conversation_states:
+            conversation_states[user_id] = {
+                "user_id": user_id,
+                "conversation_turns": 0,
+                "conversation_data": [],
+            }
 
-        logging.info(f"Initial state for user {user_id}: {state}")
+        # Retrieve or initialize chat sessions
+        if user_id not in chat_sessions:
+            chat_sessions[user_id] = {
+                "sessions": [],
+                "current_session": {
+                    "id": datetime.now().timestamp(),
+                    "title": user_question[:50],  # Use the first 50 characters of the question as the title
+                    "messages": [],
+                },
+            }
 
-        # Construct chat prompt template
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                SystemMessage(content=system_prompt),
-                MessagesPlaceholder(variable_name="chat_history"),
-                HumanMessagePromptTemplate.from_template("{human_input}"),
-            ]
-        )
-
-        # Create conversation chain
-        conversation = LLMChain(
-            llm=groq_chat,
-            prompt=prompt,
-            verbose=False,
-            memory=memory,
-        )
+        state = conversation_states[user_id]
+        current_session = chat_sessions[user_id]["current_session"]
 
         # Save the user's response
         state["conversation_data"].append({"response": user_question})
-        state["conversation_turns"] += 1
-
-        logging.info(f"Updated state for user {user_id}: {state}")
+        current_session["messages"].append({"sender": "user", "text": user_question})
 
         # Generate response
         combined_input = " ".join([qa["response"] for qa in state["conversation_data"]])
         final_prompt = f"{system_prompt}\n{combined_input}"
         response = conversation.run(human_input=final_prompt)
 
-        # Save the response
+        # Save the bot's response
+        current_session["messages"].append({"sender": "bot", "text": response})
+
+        # Update conversation state
+        state["conversation_turns"] += 1
+        conversation_states[user_id] = state
+
+        # Save the last response
         last_responses[user_id] = {
             "questions": combined_input,
-            "response": response
+            "response": response,
         }
 
-        conversation_states[user_id] = state
         return {"response": response, "status": "success"}
 
     except Exception as e:
         logging.error(f"Error during chat processing: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+@app.get("/chat_sessions/{user_id}")
+async def get_chat_sessions(user_id: str):
+    if user_id not in chat_sessions:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "status": "success",
+        "sessions": chat_sessions[user_id]["sessions"],
+    }
+
+@app.get("/chat_session/{session_id}")
+async def get_chat_session(session_id: float):
+    for user_id, sessions in chat_sessions.items():
+        for session in sessions["sessions"]:
+            if session["id"] == session_id:
+                return {
+                    "status": "success",
+                    "session": session,
+                }
+    raise HTTPException(status_code=404, detail="Session not found")
 
 @app.post("/generate_document/")
 async def generate_document(request: DocumentRequest):
@@ -204,22 +243,66 @@ async def new_chat(request: DocumentRequest):
     user_id = request.user_id
 
     try:
-        # Clear the conversation state for this user
-        if user_id in conversation_states:
-            del conversation_states[user_id]
-        
-        # Clear the last response for this user
-        if user_id in last_responses:
-            del last_responses[user_id]
-        
-        # Clear the conversation memory
-        memory.clear()
+        # Initialize chat_sessions for new users
+        if user_id not in chat_sessions:
+            chat_sessions[user_id] = {
+                "sessions": [],
+                "current_session": {
+                    "id": str(uuid4()),  # Generate a unique session ID
+                    "title": "New Chat",
+                    "messages": [],
+                },
+            }
 
-        return {"status": "success", "message": "New chat session started"}
+        # Save the current session's messages as history
+        current_session = chat_sessions[user_id]["current_session"]
+        if current_session["messages"]:
+            chat_sessions[user_id]["sessions"].append(current_session)
+
+            # Save the last response for the current session
+            last_responses[user_id] = {
+                "questions": current_session["messages"][-1]["text"],  # Last user message
+                "response": current_session["messages"][-1]["text"],  # Last bot response
+            }
+
+        # Start a new session
+        chat_sessions[user_id]["current_session"] = {
+            "id": str(uuid4()),  # Generate a unique session ID
+            "title": "New Chat",
+            "messages": [],
+        }
+
+        # Reset the conversation state for the user
+        if user_id in conversation_states:
+            conversation_states[user_id] = {
+                "user_id": user_id,
+                "conversation_turns": 0,
+                "conversation_data": [],
+            }
+
+        # Log the new chat session
+        logging.info(f"New chat session started for user {user_id}")
+        logging.info(f"Current session saved: {current_session}")
+
+        # Retrieve the history from the most recent chat session
+        if chat_sessions[user_id]["sessions"]:
+            recent_session = chat_sessions[user_id]["sessions"][-1]
+            history = recent_session["messages"]
+            logging.info(f"Retrieved history from recent chat session: {history}")
+        else:
+            history = []
+            logging.info("No history found for the user.")
+
+        return {
+            "status": "success",
+            "message": "New chat session started",
+            "history": history  # Return the history along with the success message
+        }
 
     except Exception as e:
         logging.error(f"Error starting new chat: {e}")
         raise HTTPException(status_code=500, detail="Error starting new chat")
+
 
 if __name__ == "__main__":
     import uvicorn

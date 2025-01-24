@@ -1,4 +1,5 @@
 import React from "react";
+import ReactMarkdown from "react-markdown";
 import styles from "./ChatWindow.module.css";
 
 const ChatWindow = React.forwardRef(({ messages, isLoading }, ref) => (
@@ -10,7 +11,11 @@ const ChatWindow = React.forwardRef(({ messages, isLoading }, ref) => (
           msg.sender === "user" ? styles.userMessage : styles.botMessage
         }`}
       >
-        {msg.text}
+        {msg.sender === "bot" ? (
+          <ReactMarkdown>{msg.text}</ReactMarkdown>
+        ) : (
+          msg.text
+        )}
       </div>
     ))}
     {isLoading && (
