@@ -1,35 +1,35 @@
 /* ChatInput.module.css */
 .chatInput {
-    display: flex;
-    margin-top: 20px;
-  }
-  
-  .chatInput input {
-    flex: 1;
-    padding: 12px;
-    border: 1px solid #ddd;
-    border-radius: 25px;
-    font-size: 14px;
-    outline: none;
-    transition: border-color 0.3s ease;
-  }
-  
-  .chatInput input:focus {
-    border-color: #4a90e2;
-  }
-  
-  .chatInput button {
-    background-color: #4a90e2;
-    color: white;
-    padding: 12px 24px;
-    border: none;
-    border-radius: 25px;
-    margin-left: 10px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background-color 0.3s ease;
-  }
-  
-  .chatInput button:hover {
-    background-color: #357abd;
-  }
+  display: flex;
+  margin-top: 20px;
+}
+
+.chatInput input {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 25px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.chatInput input:focus {
+  border-color: #4a90e2;
+}
+
+.chatInput button {
+  background-color: #4a90e2;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 25px;
+  margin-left: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s ease;
+}
+
+.chatInput button:hover {
+  background-color: #357abd;
+}
