@@ -5,11 +5,37 @@
 /.pnp
 .pnp.js
 
+# Build artifacts
+dist/
+build/
+
 # testing
 /coverage
 
+# Python virtual environment
+tgenv/
+pyvenv.cfg
+Lib/
+include/
+Scripts/
+__pycache__/
+*.pyc
+
 # production
 /build
+
+# Generated documents
+generated_documents/
+
+# Logs
+*.log
+
+# IDE-specific files
+.idea/
+.vscode/
+
+# macOS-specific files
+.DS_Store
 
 # misc
 .DS_Store
