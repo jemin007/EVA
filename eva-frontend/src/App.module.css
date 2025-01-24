@@ -1,46 +1,81 @@
+/* App.module.css */
 .app {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 16px;
-  background-color: #f3f4f6;
+  padding: 20px;
+  background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+  font-family: 'Poppins', sans-serif;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .header h1 {
-  font-size: 24px;
-  font-weight: bold;
+  font-size: 28px;
+  font-weight: 600;
+  color: #333;
 }
 
 .newChatButton {
-  background-color: #3b82f6;
+  background-color: #4a90e2;
   color: white;
-  padding: 8px 16px;
+  padding: 10px 20px;
   border: none;
-  border-radius: 4px;
+  border-radius: 25px;
   cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s ease;
 }
 
 .newChatButton:hover {
-  background-color: #2563eb;
+  background-color: #357abd;
 }
 
 .generateDocumentButton {
-  margin-top: 16px;
-  background-color: #10b981;
+  margin-top: 20px;
+  background-color: #34c759;
   color: white;
-  padding: 8px 16px;
+  padding: 10px 20px;
   border: none;
-  border-radius: 4px;
+  border-radius: 25px;
   cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s ease;
 }
 
 .generateDocumentButton:hover {
-  background-color: #059669;
+  background-color: #2a9d4f;
+}
+.dark {
+  background: linear-gradient(135deg, #1e1e1e, #121212);
+  color: #ffffff;
+}
+
+.dark .header h1 {
+  color: #ffffff;
+}
+
+.dark .chatWindow {
+  background-color: #2d2d2d;
+  color: #ffffff;
+}
+
+.dark .botMessage {
+  background-color: #444;
+  color: #ffffff;
+}
+
+.dark .chatInput input {
+  background-color: #444;
+  color: #ffffff;
+  border-color: #555;
+}
+
+.dark .chatInput input:focus {
+  border-color: #4a90e2;
 }

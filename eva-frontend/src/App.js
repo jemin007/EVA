@@ -11,10 +11,12 @@ function App() {
 
   const sendMessage = async (message) => {
     if (!message.trim()) return;
-
+  
     const userMessage = { sender: "user", text: message };
     setMessages((prev) => [...prev, userMessage]);
-
+  
+    setIsLoading(true); // Set loading to true
+  
     try {
       const response = await axios.post("http://localhost:8000/chat/", {
         question: message,
@@ -26,11 +28,21 @@ function App() {
       console.error("Error sending message:", error);
       const errorMessage = { sender: "bot", text: "Error: Unable to get a response." };
       setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false); // Set loading to false
     }
-
+  
     // Scroll to the bottom of the chat window
     chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
   };
+
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+  };
+
+  const [isLoading, setIsLoading] = useState(false);
 
   const generateDocument = async () => {
     try {
@@ -62,19 +74,24 @@ function App() {
   };
 
   return (
-    <div className={styles.app}>
-      <div className={styles.header}>
-        <h1>Educational Virtual Assistant (EVA)</h1>
-        <button onClick={startNewChat} className={styles.newChatButton}>
-          New Chat
-        </button>
-      </div>
-      <ChatWindow messages={messages} ref={chatWindowRef} />
-      <ChatInput sendMessage={sendMessage} />
-      <button onClick={generateDocument} className={styles.generateDocumentButton}>
-        Generate Document
+    <div className={`${styles.app} ${isDarkMode ? styles.dark : styles.light}`}>
+  <div className={styles.header}>
+    <h1>Educational Virtual Assistant (EVA)</h1>
+    <div>
+      <button onClick={toggleTheme} className={styles.themeToggleButton}>
+        {isDarkMode ? "Light Mode" : "Dark Mode"}
+      </button>
+      <button onClick={startNewChat} className={styles.newChatButton}>
+        New Chat
       </button>
     </div>
+  </div>
+  <ChatWindow messages={messages} ref={chatWindowRef} isLoading={isLoading} />
+  <ChatInput sendMessage={sendMessage} />
+  <button onClick={generateDocument} className={styles.generateDocumentButton}>
+    Generate Document
+  </button>
+</div>
   );
 }
 
