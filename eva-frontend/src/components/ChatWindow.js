@@ -1,7 +1,7 @@
 import React from "react";
 import styles from "./ChatWindow.module.css";
 
-const ChatWindow = React.forwardRef(({ messages }, ref) => (
+const ChatWindow = React.forwardRef(({ messages, isLoading }, ref) => (
   <div ref={ref} className={styles.chatWindow}>
     {messages.map((msg, index) => (
       <div
@@ -13,6 +13,11 @@ const ChatWindow = React.forwardRef(({ messages }, ref) => (
         {msg.text}
       </div>
     ))}
+    {isLoading && (
+      <div className={styles.message}>
+        <div className={styles.loadingSpinner}></div>
+      </div>
+    )}
   </div>
 ));
 
