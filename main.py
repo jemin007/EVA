@@ -160,8 +160,8 @@ async def chat(query: Query):
             chat_sessions[user_id] = {
                 "sessions": [],
                 "current_session": {
-                    "id": datetime.now().timestamp(),
-                    "title": user_question[:50],  # Use the first 50 characters of the question as the title
+                    "id": str(uuid4()),  # Ensure UUID is string
+                    "title": user_question[:50],
                     "messages": [],
                 },
             }
@@ -199,19 +199,33 @@ async def chat(query: Query):
     
 @app.get("/chat_sessions/{user_id}")
 async def get_chat_sessions(user_id: str):
+    # Initialize if user doesn't exist
     if user_id not in chat_sessions:
-        raise HTTPException(status_code=404, detail="User not found")
-
+        chat_sessions[user_id] = {
+            "sessions": [],
+            "current_session": {
+                "id": str(uuid4()),
+                "title": "New Chat",
+                "messages": []
+            }
+        }
+    
+    # Return both historical sessions and current session
     return {
         "status": "success",
-        "sessions": chat_sessions[user_id]["sessions"],
+        "sessions": [
+            *chat_sessions[user_id]["sessions"],
+            chat_sessions[user_id]["current_session"]
+        ],
     }
 
 @app.get("/chat_session/{session_id}")
-async def get_chat_session(session_id: float):
+async def get_chat_session(session_id: str):  # Changed from float to str
     for user_id, sessions in chat_sessions.items():
-        for session in sessions["sessions"]:
-            if session["id"] == session_id:
+        # Check both current session and archived sessions
+        all_sessions = sessions["sessions"] + [sessions["current_session"]]
+        for session in all_sessions:
+            if str(session["id"]) == session_id:
                 return {
                     "status": "success",
                     "session": session,
@@ -253,7 +267,18 @@ async def new_chat(request: DocumentRequest):
                     "messages": [],
                 },
             }
+        else:
+            # Archive current session if it has messages
+            current_session = chat_sessions[user_id]["current_session"]
+            if current_session["messages"]:
+                chat_sessions[user_id]["sessions"].append(current_session)
 
+            # Create new session
+            chat_sessions[user_id]["current_session"] = {
+                "id": str(uuid4()),
+                "title": "New Chat",
+                "messages": [],
+            }
         # Save the current session's messages as history
         current_session = chat_sessions[user_id]["current_session"]
         if current_session["messages"]:
