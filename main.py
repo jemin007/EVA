@@ -26,9 +26,7 @@ import logging
 # Load environment variables from a .env file
 load_dotenv()
 
-# Initialize environment variable
-groq_api_key = "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"
-
+groq_api_key = os.getenv("GROQ_API_KEY")  
 if not groq_api_key:
     raise ValueError("GROQ_API_KEY environment variable not set")
 
@@ -42,12 +40,17 @@ last_responses = {}  # New dictionary to store the last response for each user
 app = FastAPI()
 
 # Add CORS middleware
+allowed_origins = [
+    "http://localhost:3000",
+    "https://evatool.ai/"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=allowed_origins,  
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Initialize Groq client
