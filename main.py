@@ -27,7 +27,6 @@ from pydantic_settings import BaseSettings
 # Load environment variables from a .env file
 load_dotenv()
 
-
 # Configuration using pydantic-settings
 class Settings(BaseSettings):
     groq_api_key: str
@@ -74,6 +73,8 @@ model = 'llama-3.2-90b-vision-preview'
 # model= "llama-3.1-70b-versatile"
 #model = "llama-3.3-70b-versatile"
 #model = 'deepseek-r1-distill-llama-70b
+# test with openai
+#model="gpt-4o-mini"
 
 groq_chat = ChatGroq(
     groq_api_key=settings.groq_api_key,
@@ -204,7 +205,10 @@ async def chat(query: Query):
         current_session["messages"].append({"sender": "user", "text": user_question})
 
         # Generate response
-        combined_input = " ".join([qa["response"] for qa in state["conversation_data"]])
+        MAX_HISTORY_LENGTH = 5
+        combined_input = " ".join([qa["response"] for qa in state["conversation_data"][-MAX_HISTORY_LENGTH:]])
+
+        #combined_input = " ".join([qa["response"] for qa in state["conversation_data"]])
         final_prompt = f"{system_prompt}\n{combined_input}"
         response = conversation.run(human_input=final_prompt)
 
@@ -327,6 +331,8 @@ async def new_chat(request: DocumentRequest):
 
         # Log the new chat session
         logging.info(f"New chat session started for user {user_id}")
+        #last_responses.pop(user_id, None)  # Clear previous response data
+
 
         return {
             "status": "success",
