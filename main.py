@@ -20,21 +20,34 @@ from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from uuid import uuid4
-from datetime import datetime
-import logging
+import aiofiles
+import aiofiles.os
+from pydantic_settings import BaseSettings
 
 # Load environment variables from a .env file
 load_dotenv()
 
-groq_api_key = os.getenv("GROQ_API_KEY")  
-if not groq_api_key:
-    raise ValueError("GROQ_API_KEY environment variable not set")
+
+# Configuration using pydantic-settings
+class Settings(BaseSettings):
+    groq_api_key: str
+    document_dir: str = os.path.join(os.path.dirname(__file__), "generated_documents")
+    max_file_age_hours: int = 24
+    log_level: str = "INFO"
+
+    class Config:
+        env_file = ".env"
+
+
+settings = Settings()
+
+# Initialize logging
+logging.basicConfig(level=settings.log_level)
 
 # In-memory storage
 conversation_states = {}
 chat_history = []
 chat_sessions = {}
-
 last_responses = {}  # New dictionary to store the last response for each user
 
 app = FastAPI()
@@ -47,16 +60,23 @@ allowed_origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,  
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 # Initialize Groq client
-model = 'llama3-70b-8192'
+#model = 'llama3-70b-8192'
+# testing more models
+model = 'llama-3.2-90b-vision-preview'
+# model= "llama-3.1-70b-versatile"
+#model = "llama-3.3-70b-versatile"
+#model = 'deepseek-r1-distill-llama-70b
+
 groq_chat = ChatGroq(
-    groq_api_key=groq_api_key, 
+    groq_api_key=settings.groq_api_key,
     model_name=model
 )
 
@@ -88,19 +108,24 @@ conversation = LLMChain(
 )
 
 # Create a directory for storing Word documents
-DOCUMENT_DIR = os.path.join(os.path.dirname(__file__), "generated_documents")
+DOCUMENT_DIR = settings.document_dir
 os.makedirs(DOCUMENT_DIR, exist_ok=True)
+
 
 class Query(BaseModel):
     question: str
     user_id: str
 
+
 class DocumentRequest(BaseModel):
     user_id: str
 
-def create_word_document(user_id: str, questions: str, response: str) -> str:
+
+async def create_word_document(user_id: str, questions: str, response: str) -> str:
+    """Create a Word document with the chat history and response."""
+    os.makedirs(DOCUMENT_DIR, exist_ok=True)  # Ensure directory exists
     doc = Document()
-    
+
     # Add title
     title = doc.add_heading('Educational Virtual Assistant (EVA) Response', level=0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -115,7 +140,7 @@ def create_word_document(user_id: str, questions: str, response: str) -> str:
 
     # Add response section
     doc.add_heading('Response:', level=1)
-    
+
     # Split the response into paragraphs and add them to the document
     paragraphs = response.split('\n')
     for para in paragraphs:
@@ -131,15 +156,17 @@ def create_word_document(user_id: str, questions: str, response: str) -> str:
     doc.save(filepath)
     return filepath
 
-def cleanup_old_files(max_age_hours=24):
+
+async def cleanup_old_files(max_age_hours: int = settings.max_file_age_hours):
     """Remove files older than the specified age."""
     current_time = datetime.now()
     for filename in os.listdir(DOCUMENT_DIR):
         file_path = os.path.join(DOCUMENT_DIR, filename)
         file_modified_time = datetime.fromtimestamp(os.path.getmtime(file_path))
         if current_time - file_modified_time > timedelta(hours=max_age_hours):
-            os.remove(file_path)
+            await aiofiles.os.remove(file_path)
             logging.info(f"Removed old file: {filename}")
+
 
 @app.post("/chat/")
 async def chat(query: Query):
@@ -199,7 +226,8 @@ async def chat(query: Query):
     except Exception as e:
         logging.error(f"Error during chat processing: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
-    
+
+
 @app.get("/chat_sessions/{user_id}")
 async def get_chat_sessions(user_id: str):
     # Initialize if user doesn't exist
@@ -212,7 +240,7 @@ async def get_chat_sessions(user_id: str):
                 "messages": []
             }
         }
-    
+
     # Return both historical sessions and current session
     return {
         "status": "success",
@@ -221,6 +249,7 @@ async def get_chat_sessions(user_id: str):
             chat_sessions[user_id]["current_session"]
         ],
     }
+
 
 @app.get("/chat_session/{session_id}")
 async def get_chat_session(session_id: str):  # Changed from float to str
@@ -235,6 +264,7 @@ async def get_chat_session(session_id: str):  # Changed from float to str
                 }
     raise HTTPException(status_code=404, detail="Session not found")
 
+
 @app.post("/generate_document/")
 async def generate_document(request: DocumentRequest):
     user_id = request.user_id
@@ -244,16 +274,21 @@ async def generate_document(request: DocumentRequest):
 
     try:
         last_response = last_responses[user_id]
-        filepath = create_word_document(user_id, last_response["questions"], last_response["response"])
+        filepath = await create_word_document(user_id, last_response["questions"], last_response["response"])
 
         # Cleanup old files
-        cleanup_old_files()
+        await cleanup_old_files()
 
-        return FileResponse(filepath, filename=os.path.basename(filepath), media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        return FileResponse(filepath, filename=os.path.basename(filepath),
+                            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
+    except FileNotFoundError as e:
+        logging.error(f"File not found: {e}")
+        raise HTTPException(status_code=404, detail="File not found")
     except Exception as e:
         logging.error(f"Error generating document: {e}")
         raise HTTPException(status_code=500, detail="Error generating document")
+
 
 @app.post("/new_chat/")
 async def new_chat(request: DocumentRequest):
@@ -282,49 +317,20 @@ async def new_chat(request: DocumentRequest):
                 "title": "New Chat",
                 "messages": [],
             }
-        # Save the current session's messages as history
-        current_session = chat_sessions[user_id]["current_session"]
-        if current_session["messages"]:
-            chat_sessions[user_id]["sessions"].append(current_session)
-
-            # Save the last response for the current session
-            last_responses[user_id] = {
-                "questions": current_session["messages"][-1]["text"],  # Last user message
-                "response": current_session["messages"][-1]["text"],  # Last bot response
-            }
-
-        # Start a new session
-        chat_sessions[user_id]["current_session"] = {
-            "id": str(uuid4()),  # Generate a unique session ID
-            "title": "New Chat",
-            "messages": [],
-        }
 
         # Reset the conversation state for the user
-        if user_id in conversation_states:
-            conversation_states[user_id] = {
-                "user_id": user_id,
-                "conversation_turns": 0,
-                "conversation_data": [],
-            }
+        conversation_states[user_id] = {
+            "user_id": user_id,
+            "conversation_turns": 0,
+            "conversation_data": [],
+        }
 
         # Log the new chat session
         logging.info(f"New chat session started for user {user_id}")
-        logging.info(f"Current session saved: {current_session}")
-
-        # Retrieve the history from the most recent chat session
-        if chat_sessions[user_id]["sessions"]:
-            recent_session = chat_sessions[user_id]["sessions"][-1]
-            history = recent_session["messages"]
-            logging.info(f"Retrieved history from recent chat session: {history}")
-        else:
-            history = []
-            logging.info("No history found for the user.")
 
         return {
             "status": "success",
             "message": "New chat session started",
-            "history": history  # Return the history along with the success message
         }
 
     except Exception as e:
@@ -334,4 +340,5 @@ async def new_chat(request: DocumentRequest):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
