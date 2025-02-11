@@ -169,6 +169,9 @@ async def cleanup_old_files(max_age_hours: int = settings.max_file_age_hours):
             await aiofiles.os.remove(file_path)
             logging.info(f"Removed old file: {filename}")
 
+@app.get("/")
+async def read_root():
+    return {"message": "Welcome to the Educational Virtual Assistant (EVA) API!"}
 
 @app.post("/chat/")
 async def chat(query: Query):
