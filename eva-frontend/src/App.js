@@ -12,7 +12,7 @@ function App() {
   const user_id = "user123"; // Replace with the actual user ID
 
   // Use environment variable for API URL
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+  const API_URL = process.env.REACT_APP_API_URL;
 
   const sendMessage = async (message) => {
     if (!message.trim()) return;
