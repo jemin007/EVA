@@ -54,8 +54,7 @@ app = FastAPI()
 # Add CORS middleware
 allowed_origins = [
     "http://localhost:3000",
-    "https://evatool.ai/",
-    "https://eva-frontend-lvdg.onrender.com/"
+    "https://eva-frontend-lvdg.onrender.com"
 ]
 
 app.add_middleware(
