@@ -55,7 +55,7 @@ app = FastAPI()
 allowed_origins = [
     "http://localhost:3000",
     "https://evatool.ai/",
-    "https://eva-e32o.onrender.com/"
+    "https://eva-frontend-lvdg.onrender.com/"
 ]
 
 app.add_middleware(
