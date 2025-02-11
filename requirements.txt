@@ -3,6 +3,8 @@ fastapi>=0.103.0,<0.104.0
 
 # Pydantic - ensuring compatibility with LangChain
 pydantic>=2.7.4,<3.0.0
+pydantic-settings
+
 
 # LangChain and related packages
 langchain>=0.3.0,<0.4.0
