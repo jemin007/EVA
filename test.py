@@ -1,8 +1,8 @@
 import os
-from typing import List, Dict, Any, Set
-from fastapi import FastAPI, HTTPException, Request
+from typing import List, Dict, Any
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from langchain.chains import LLMChain
 from langchain_core.prompts import (
     ChatPromptTemplate,
@@ -15,7 +15,7 @@ from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import logging
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -23,13 +23,10 @@ from uuid import uuid4
 import aiofiles
 import aiofiles.os
 from pydantic_settings import BaseSettings
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-import asyncio
-
+from passlib.context import CryptContext
+from jose import JWTError, jwt
 # Load environment variables from a .env file
 load_dotenv()
-
 
 # Configuration using pydantic-settings
 class Settings(BaseSettings):
@@ -53,18 +50,12 @@ chat_history = []
 chat_sessions = {}
 last_responses = {}  # New dictionary to store the last response for each user
 
-# In-memory storage for daily usage
-daily_usage = {}
-
-# Rate limiter
-limiter = Limiter(key_func=get_remote_address)
-
 app = FastAPI()
-app.state.limiter = limiter
 
 # Add CORS middleware
 allowed_origins = [
     "http://localhost:3000",
+    "http://localhost:5173",
     "https://evatool.ai/"
 ]
 
@@ -76,8 +67,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Initialize Groq client
-model = "llama-3.3-70b-versatile"
+#model = 'llama3-70b-8192'
+# testing more models
+model = 'llama-3.2-90b-vision-preview'
+# model= "llama-3.1-70b-versatile"
+#model = "llama-3.3-70b-versatile"
+#model = 'deepseek-r1-distill-llama-70b
+# test with openai
+#model="gpt-4o-mini"
 
 groq_chat = ChatGroq(
     groq_api_key=settings.groq_api_key,
@@ -115,8 +114,16 @@ conversation = LLMChain(
 DOCUMENT_DIR = settings.document_dir
 os.makedirs(DOCUMENT_DIR, exist_ok=True)
 
+#user signup in memory testing
 
-# Models
+users_db = {}
+# JWT Secret Key & Expiry
+SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# Password Hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 class Query(BaseModel):
     question: str
     user_id: str
@@ -125,43 +132,36 @@ class Query(BaseModel):
 class DocumentRequest(BaseModel):
     user_id: str
 
+# user signup class
+class UserSignup(BaseModel):
+    name:str
+    email:EmailStr
+    password:str
 
-# Utility Functions
-def log_usage(user_id: str):
-    """Log a user's execution for the current day."""
-    today = date.today()
-    if today not in daily_usage:
-        daily_usage[today] = {"users": set(), "executions": 0}
+# Function to create JWT token
+def create_access_token(data: dict, expires_delta: timedelta):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + expires_delta
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-    daily_usage[today]["users"].add(user_id)
-    daily_usage[today]["executions"] += 1
+@app.post("/signup/")
+async def signup(user: UserSignup):
+    if user.email in users_db:
+        raise HTTPException(status_code=400, detail="Email already registered")
 
-
-def get_daily_usage(today: date) -> Dict[str, int]:
-    """Get the number of unique users and executions for a given day."""
-    if today not in daily_usage:
-        return {"users": 0, "executions": 0}
-    return {
-        "users": len(daily_usage[today]["users"]),
-        "executions": daily_usage[today]["executions"],
+    hashed_password = pwd_context.hash(user.password)
+    users_db[user.email] = {
+        "name": user.name,
+        "email": user.email,
+        "password": hashed_password,
     }
 
+    # Generate token
+    access_token = create_access_token(data={"sub": user.email},
+                                       expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
 
-def calculate_daily_cost(today: date) -> float:
-    """Calculate the daily cost based on usage tiers."""
-    usage = get_daily_usage(today)
-    users = usage["users"]
-    executions = usage["executions"]
-
-    if users <= 50 and executions <= 250:  # 50 users * 5 executions
-        return users * 0.10  # $0.10 per user
-    elif users <= 200 and executions <= 2000:  # 200 users * 10 executions
-        return users * 0.08  # $0.08 per user
-    elif users <= 1000 and executions <= 10000:  # 1000 users * 10 executions
-        return users * 0.05  # $0.05 per user
-    else:
-        return users * 0.03  # $0.03 per user for overages
-
+    return {"message": "User registered successfully", "access_token": access_token, "token_type": "bearer"}
 
 async def create_word_document(user_id: str, questions: str, response: str) -> str:
     """Create a Word document with the chat history and response."""
@@ -210,16 +210,8 @@ async def cleanup_old_files(max_age_hours: int = settings.max_file_age_hours):
             logging.info(f"Removed old file: {filename}")
 
 
-async def async_conversation_run(human_input: str) -> str:
-    """Run the conversation asynchronously."""
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, conversation.run, human_input)
-
-
-# Endpoints
 @app.post("/chat/")
-@limiter.limit("5/minute")  # Rate limiting
-async def chat(request: Request, query: Query):
+async def chat(query: Query):
     user_question = query.question
     user_id = query.user_id
 
@@ -227,9 +219,6 @@ async def chat(request: Request, query: Query):
         raise HTTPException(status_code=400, detail="Question must not be empty")
 
     try:
-        # Log the user's execution
-        log_usage(user_id)
-
         # Retrieve or initialize conversation state
         if user_id not in conversation_states:
             conversation_states[user_id] = {
@@ -238,21 +227,38 @@ async def chat(request: Request, query: Query):
                 "conversation_data": [],
             }
 
-        state = conversation_states[user_id]
+        # Retrieve or initialize chat sessions
+        if user_id not in chat_sessions:
+            chat_sessions[user_id] = {
+                "sessions": [],
+                "current_session": {
+                    "id": str(uuid4()),  # Ensure UUID is string
+                    "title": user_question[:50],
+                    "messages": [],
+                },
+            }
 
-        # Limit the number of stored conversation turns
-        MAX_CONVERSATION_TURNS = 10
-        if len(state["conversation_data"]) >= MAX_CONVERSATION_TURNS:
-            state["conversation_data"].pop(0)  # Remove the oldest turn
+        state = conversation_states[user_id]
+        current_session = chat_sessions[user_id]["current_session"]
 
         # Save the user's response
         state["conversation_data"].append({"response": user_question})
-        state["conversation_turns"] += 1
+        current_session["messages"].append({"sender": "user", "text": user_question})
 
         # Generate response
-        combined_input = " ".join([qa["response"] for qa in state["conversation_data"]])
+        MAX_HISTORY_LENGTH = 5
+        combined_input = " ".join([qa["response"] for qa in state["conversation_data"][-MAX_HISTORY_LENGTH:]])
+
+        #combined_input = " ".join([qa["response"] for qa in state["conversation_data"]])
         final_prompt = f"{system_prompt}\n{combined_input}"
-        response = await async_conversation_run(final_prompt)  # Asynchronous call
+        response = conversation.run(human_input=final_prompt)
+
+        # Save the bot's response
+        current_session["messages"].append({"sender": "bot", "text": response})
+
+        # Update conversation state
+        state["conversation_turns"] += 1
+        conversation_states[user_id] = state
 
         # Save the last response
         last_responses[user_id] = {
@@ -267,18 +273,28 @@ async def chat(request: Request, query: Query):
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
-@app.get("/daily_usage/")
-async def get_daily_usage_endpoint():
-    """Get daily usage and cost."""
-    today = date.today()
-    usage = get_daily_usage(today)
-    cost = calculate_daily_cost(today)
+@app.get("/chat_sessions/{user_id}")
+async def get_chat_sessions(user_id: str):
+    # Initialize if user doesn't exist
+    if user_id not in chat_sessions:
+        chat_sessions[user_id] = {
+            "sessions": [],
+            "current_session": {
+                "id": str(uuid4()),
+                "title": "New Chat",
+                "messages": []
+            }
+        }
+
+    # Return both historical sessions and current session
     return {
-        "date": today.isoformat(),
-        "users": usage["users"],
-        "executions": usage["executions"],
-        "cost": cost,
+        "status": "success",
+        "sessions": [
+            *chat_sessions[user_id]["sessions"],
+            chat_sessions[user_id]["current_session"]
+        ],
     }
+
 
 @app.get("/chat_session/{session_id}")
 async def get_chat_session(session_id: str):  # Changed from float to str
@@ -367,7 +383,6 @@ async def new_chat(request: DocumentRequest):
     except Exception as e:
         logging.error(f"Error starting new chat: {e}")
         raise HTTPException(status_code=500, detail="Error starting new chat")
-
 
 
 if __name__ == "__main__":
