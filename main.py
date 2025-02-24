@@ -23,7 +23,7 @@ from uuid import uuid4
 import aiofiles
 import aiofiles.os
 from pydantic_settings import BaseSettings
-
+from passlib.context import CryptContext
 # Load environment variables from a .env file
 load_dotenv()
 
@@ -54,6 +54,7 @@ app = FastAPI()
 # Add CORS middleware
 allowed_origins = [
     "http://localhost:3000",
+    "http://localhost:5173",
     "https://evatool.ai/"
 ]
 
@@ -69,9 +70,9 @@ app.add_middleware(
 # Initialize Groq client
 #model = 'llama3-70b-8192'
 # testing more models
-model = 'llama-3.2-90b-vision-preview'
+#model = 'llama-3.2-90b-vision-preview'
 # model= "llama-3.1-70b-versatile"
-#model = "llama-3.3-70b-versatile"
+model = "llama-3.3-70b-versatile"
 #model = 'deepseek-r1-distill-llama-70b
 # test with openai
 #model="gpt-4o-mini"
@@ -112,6 +113,11 @@ conversation = LLMChain(
 DOCUMENT_DIR = settings.document_dir
 os.makedirs(DOCUMENT_DIR, exist_ok=True)
 
+#user signup in memory testing
+users_db = {}
+
+# Password Hashing
+#pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class Query(BaseModel):
     question: str
@@ -121,6 +127,25 @@ class Query(BaseModel):
 class DocumentRequest(BaseModel):
     user_id: str
 
+# user signup class
+class UserSignup(BaseModel):
+    name:str
+    email:EmailStr
+    password:str
+
+@app.post("/signup/")
+async def signup(user: UserSignup):
+    if user.email in users_db:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    hashed_password = pwd_context.hash(user.password)
+    users_db[user.email] = {
+        "name": user.name,
+        "email": user.email,
+        "password": hashed_password,
+    }
+
+    return {"message": "User registered successfully"}
 
 async def create_word_document(user_id: str, questions: str, response: str) -> str:
     """Create a Word document with the chat history and response."""
