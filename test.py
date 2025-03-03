@@ -1,6 +1,6 @@
 import os
 from typing import List, Dict, Any
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException , Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, EmailStr
 from langchain.chains import LLMChain
@@ -25,6 +25,8 @@ import aiofiles.os
 from pydantic_settings import BaseSettings
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+
 # Load environment variables from a .env file
 load_dotenv()
 
@@ -71,9 +73,9 @@ app.add_middleware(
 # Initialize Groq client
 #model = 'llama3-70b-8192'
 # testing more models
-model = 'llama-3.2-90b-vision-preview'
+#model = 'llama-3.2-90b-vision-preview'
 # model= "llama-3.1-70b-versatile"
-#model = "llama-3.3-70b-versatile"
+model = "llama-3.3-70b-versatile"
 #model = 'deepseek-r1-distill-llama-70b
 # test with openai
 #model="gpt-4o-mini"
@@ -123,6 +125,8 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # Password Hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
 
 class Query(BaseModel):
     question: str
@@ -137,6 +141,25 @@ class UserSignup(BaseModel):
     name:str
     email:EmailStr
     password:str
+
+# user login class
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+# JWT Token Response Model
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+# Function to Hash Password
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+#  Function to Verify Password
+def verify_password(plain_password, hashed_password) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
 
 # Function to create JWT token
 def create_access_token(data: dict, expires_delta: timedelta):
@@ -162,6 +185,37 @@ async def signup(user: UserSignup):
                                        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
 
     return {"message": "User registered successfully", "access_token": access_token, "token_type": "bearer"}
+
+# Login Route
+@app.post("/login/")
+async def login(user: UserLogin):  # Change input to UserLogin model
+    user_data = users_db.get(user.email)
+
+    if not user_data or not verify_password(user.password, user_data["password"]):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    access_token = create_access_token(
+        data={"sub": user.email},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    return {"message": "Login Successful", "access_token": access_token, "token_type": "bearer"}
+
+
+
+# Protected Route
+@app.get("/protected/")
+async def protected_route(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+
+        if email not in users_db:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        return {"message": "Access granted", "user": users_db[email]["name"]}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 async def create_word_document(user_id: str, questions: str, response: str) -> str:
     """Create a Word document with the chat history and response."""
