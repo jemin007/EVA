@@ -96,6 +96,7 @@
 import React, { useState,useEffect } from "react";
 import {useRef} from "react";
 import { Send, Download, Sparkles, GraduationCap, BookOpen, Brain, FileSpreadsheet, Bot, User } from "lucide-react";
+import { v4 as uuidv4 } from "uuid"; // Import uuid for generating unique user IDs
 
 interface Message {
   sender: string;
@@ -107,8 +108,22 @@ const Home: React.FC = () => {
   const [message, setMessage] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [userId, setUserId] = useState<string>(""); // State to hold the dynamic user ID
 
-  const user_id = "user123"; // Replace with actual user ID
+
+ // Generate and store a unique user ID in localStorage
+  useEffect(() => {
+    const storedUserId = localStorage.getItem("user_id");
+
+    if (!storedUserId) {
+      const newUserId = uuidv4(); // Generate a new UUID for the user
+      localStorage.setItem("user_id", newUserId); // Store the new user ID in localStorage
+      setUserId(newUserId); // Set the state for user ID
+    } else {
+      setUserId(storedUserId); // Use the stored user ID from localStorage
+    }
+  }, []);
+
 
   const features = [
     {
@@ -116,21 +131,21 @@ const Home: React.FC = () => {
       description: "Generate custom assignments with AI assistance",
       icon: FileSpreadsheet,
       gradient: "from-blue-600 to-cyan-500",
-      onClick: () => console.log("Create assignment"),
+      onClick: () => sendMessage("Create assignment"),
     },
     {
       title: "Generate a Quiz",
       description: "Create engaging quizzes in seconds",
       icon: Brain,
       gradient: "from-purple-600 to-pink-500",
-      onClick: () => console.log("Generate quiz"),
+      onClick: ()=> sendMessage("Generate quiz"),
     },
     {
       title: "Create Course Outline",
       description: "Design comprehensive course structures",
       icon: BookOpen,
       gradient: "from-green-500 to-teal-500",
-      onClick: () => console.log("Create course outline"),
+      onClick: () => sendMessage("Create course outline"),
     },
   ];
   const messagesEndRef = useRef(null);
@@ -144,6 +159,8 @@ const Home: React.FC = () => {
   }, [messages]);
 
   const sendMessage = async (messageText: string) => {
+      const userId = localStorage.getItem("user_id") || uuidv4(); // Get or generate user ID
+
     if (!messageText.trim()) return;
 
     // Hide home page when first message is sent
@@ -164,7 +181,7 @@ const Home: React.FC = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ question: messageText, user_id: user_id }),
+        body: JSON.stringify({ question: messageText, user_id: userId }),
       });
 
       const data = await response.json();
@@ -191,9 +208,32 @@ const Home: React.FC = () => {
     setMessage(""); // Clear the input field after sending
   };
 
-  const startNewChat = () => {
-    setMessages([]);
-    setShowHomePage(true);
+  // const startNewChat = () => {
+  //   setMessages([]);
+  //   setShowHomePage(true);
+  // };
+
+
+   const startNewChat = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/new_chat/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ user_id: userId }),
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        setMessages([]);
+        setShowHomePage(true);
+        console.log(data.message);
+      }
+    } catch (error) {
+      console.error("Error starting new chat:", error);
+    }
   };
 
   return (

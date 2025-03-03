@@ -1,14 +1,48 @@
 import React, { useState } from 'react';
 import { Mail, Lock } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate(); // Hook for navigation
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login:', { email, password });
+    setError(''); // Reset any previous errors
+
+    const loginData = { email, password };
+
+    try {
+      const response = await fetch('http://localhost:8000/login/', {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(loginData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log('Login successful:', data);
+
+        // Store user information in localStorage
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user_id', data.user_id); // Store user_id
+        localStorage.setItem('username', data.username); // Store username
+        localStorage.setItem('email', data.email); // Store email
+
+        // Redirect user to the dashboard
+        navigate('/dashboard');
+      } else {
+        setError(data.detail || 'Login failed. Please check your credentials.');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setError('An error occurred. Please try again.');
+    }
   };
 
   return (
@@ -18,12 +52,11 @@ const Login = () => {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
             Welcome Back
           </h1>
-          <p className="text-gray-600">
-            Sign in to continue your journey with EVA
-          </p>
+          <p className="text-gray-600">Sign in to continue your journey with EVA</p>
         </div>
 
         <div className="bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-xl">
+          {error && <p className="text-red-500 text-center mb-4">{error}</p>}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
@@ -37,6 +70,7 @@ const Login = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full p-3 pl-10 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter your email"
+                  required
                 />
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               </div>
@@ -54,6 +88,7 @@ const Login = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full p-3 pl-10 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter your password"
+                  required
                 />
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               </div>
