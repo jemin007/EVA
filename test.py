@@ -1,6 +1,6 @@
 import os
-from typing import List, Dict, Any
-from fastapi import FastAPI, HTTPException , Depends
+from typing import List, Dict, Any, Set
+from fastapi import FastAPI, HTTPException , Depends, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, EmailStr
 from langchain.chains import LLMChain
@@ -119,6 +119,8 @@ os.makedirs(DOCUMENT_DIR, exist_ok=True)
 #user signup in memory testing
 
 users_db = {}
+token_blacklist: Set[str] = set()
+
 # JWT Secret Key & Expiry
 SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
 ALGORITHM = "HS256"
@@ -216,6 +218,18 @@ async def protected_route(token: str = Depends(oauth2_scheme)):
         return {"message": "Access granted", "user": users_db[email]["name"]}
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+# Logout Route
+@app.post("/logout/")
+async def logout(request: Request):
+    token = request.headers.get("Authorization")
+    if not token or not token.startswith("Bearer "):
+        raise HTTPException(status_code=400, detail="Invalid token format")
+
+    token = token.split("Bearer ")[1]
+    token_blacklist.add(token)  # Add token to blacklist
+
+    return {"message": "Successfully logged out"}
 
 async def create_word_document(user_id: str, questions: str, response: str) -> str:
     """Create a Word document with the chat history and response."""
