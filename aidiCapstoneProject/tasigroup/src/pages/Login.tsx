@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +34,7 @@ const Login = () => {
         localStorage.setItem('email', data.email); // Store email
 
         // Redirect user to the dashboard
-        navigate('/dashboard');
+        navigate("/dashboard");
       } else {
         setError(data.detail || 'Login failed. Please check your credentials.');
       }
