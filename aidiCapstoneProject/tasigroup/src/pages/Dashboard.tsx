@@ -8,10 +8,13 @@ const Dashboard = () => {
 
   useEffect(() => {
     const email = localStorage.getItem("user_email");
+    console.log("email",email) // debugging code
     if (!email) {
-      navigate("/login"); // Redirect if not logged in
+      navigate("/login");
     } else {
       setUserEmail(email);
+      console.log("email",email) // debugging code
+
     }
   }, [navigate]);
 
@@ -36,9 +39,8 @@ const Dashboard = () => {
 
       if (response.ok) {
         // Clear frontend storage
-        localStorage.removeItem("user_id");
-        localStorage.removeItem("user_email");
-        localStorage.removeItem("token");
+        localStorage.clear(); // Clears all user data
+        window.dispatchEvent(new Event("storage")); // Notify other components
         navigate("/login");
       } else {
         console.error("Logout failed:", response.statusText);

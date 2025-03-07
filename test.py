@@ -56,7 +56,6 @@ app = FastAPI()
 
 # Add CORS middleware
 allowed_origins = [
-    "http://localhost:3000",
     "http://localhost:5173",
     "https://evatool.ai/"
 ]
@@ -73,30 +72,42 @@ app.add_middleware(
 # Initialize Groq client
 #model = 'llama3-70b-8192'
 # testing more models
-#model = 'llama-3.2-90b-vision-preview'
+model = 'llama-3.2-90b-vision-preview'
 # model= "llama-3.1-70b-versatile"
-model = "llama-3.3-70b-versatile"
+#model = "llama-3.3-70b-versatile"
 #model = 'deepseek-r1-distill-llama-70b
 # test with openai
 #model="gpt-4o-mini"
 
 groq_chat = ChatGroq(
     groq_api_key=settings.groq_api_key,
-    model_name=model
+    model_name=model,
+    temperature=0.0
 )
 
 # Setup conversation memory
 conversational_memory_length = 20
 memory = ConversationBufferWindowMemory(k=conversational_memory_length, memory_key="chat_history", return_messages=True)
+#
+# system_prompt = (
+#     'You are Educational Virtual Assistant (EVA) that is an AI-powered platform designed to streamline and enhance '
+#     'the educational process for educators and students. Act as an interviewer and always respond with a follow-up '
+#     'question to gather more information from the user, and stop responding questions after giving the final response. Do not provide direct answers, but instead ask follow-up questions '
+#     'to help the user refine their input. Remember to stay focused on educational topics and assist the user in creating '
+#     'tailored prompts for their needs. Avoid asking more than 7 questions before generating the final response. Provide the final answer after gathered the minimum details and make sure to provide all the answers as well for the assignments, quizzes or rubrics.'
+# )
 
-# Setup system prompt
 system_prompt = (
-    'You are Educational Virtual Assistant (EVA) that is an AI-powered platform designed to streamline and enhance '
-    'the educational process for educators and students. Act as an interviewer and always respond with a follow-up '
-    'question to gather more information from the user, and stop responding questions after giving the final response. Do not provide direct answers, but instead ask follow-up questions '
-    'to help the user refine their input. Remember to stay focused on educational topics and assist the user in creating '
-    'tailored prompts for their needs. Avoid asking more than 7 questions before generating the final response. Provide the final answer after gathered the minimum details and make sure to provide all the answers as well for the assignments, quizzes or rubrics.'
+'You are Educational Virtual Assistant (EVA) that is an AI-powered platform designed to streamline and enhance '
+'the educational process for educators and students. Act as an interviewer and always respond with a follow-up '
+'question to gather more information from the user, and stop responding questions after giving the final response. Do not provide direct answers, but instead ask follow-up questions '
+'to help the user refine their input. Remember to stay focused on educational topics and assist the user in creating '
+'tailored prompts for their needs. Avoid asking more than 7 questions before generating the final response. Provide the final answer after gathered the minimum details and make sure to provide all the answers as well for the assignments, quizzes or rubrics.'
+
+'Not possible. I can give you the Read me, if you\'d like.'
 )
+
+
 
 # Initialize conversation chain
 conversation = LLMChain(
