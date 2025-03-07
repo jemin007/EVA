@@ -32,6 +32,7 @@ const Login = () => {
         localStorage.setItem('user_id', data.user_id); // Store user_id
         localStorage.setItem('username', data.username); // Store username
         localStorage.setItem('email', data.email); // Store email
+        console.log("Stored user_id:", localStorage.getItem("user_id"));//check
 
         // Redirect user to the dashboard
         navigate("/dashboard");
