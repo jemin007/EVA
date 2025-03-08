@@ -27,6 +27,8 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
+from firebase import db 
+
 # Load environment variables from a .env file
 load_dotenv()
 
@@ -149,7 +151,7 @@ class Query(BaseModel):
 class DocumentRequest(BaseModel):
     user_id: str
 
-# user signup class
+#user signup class
 class UserSignup(BaseModel):
     name:str
     email:EmailStr
@@ -183,38 +185,49 @@ def create_access_token(data: dict, expires_delta: timedelta):
 
 @app.post("/signup/")
 async def signup(user: UserSignup):
-    if user.email in users_db:
+    user_ref = db.collection("users").document(user.email)
+    
+    # Check if user already exists
+    if user_ref.get().exists:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    hashed_password = pwd_context.hash(user.password)
-    users_db[user.email] = {
+    hashed_password = hash_password(user.password)
+    
+    # Save user data in Firestore
+    user_ref.set({
         "name": user.name,
         "email": user.email,
-        "password": hashed_password,
-    }
+        "hashed_password": hashed_password
+    })
 
-    # Generate token
-    access_token = create_access_token(data={"sub": user.email},
-                                       expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    access_token = create_access_token(data={"sub": user.email}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
 
     return {"message": "User registered successfully", "access_token": access_token, "token_type": "bearer"}
 
+
 # Login Route
 @app.post("/login/")
-async def login(user: UserLogin):  # Change input to UserLogin model
-    user_data = users_db.get(user.email)
+async def login(user: UserLogin):
+    user_ref = db.collection("users").document(user.email)
+    user_doc = user_ref.get()
 
-    if not user_data or not verify_password(user.password, user_data["password"]):
+    # Debug: Check if the user exists
+    if not user_doc.exists:
+        print(f"User with email {user.email} does not exist.")
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
-    access_token = create_access_token(
-        data={"sub": user.email},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
+    user_data = user_doc.to_dict()
+
+    # Debug: Check if the password matches
+    if not verify_password(user.password, user_data["hashed_password"]):
+        print(f"Invalid password for user {user.email}.")
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    # Debug: Check if the token is being generated
+    access_token = create_access_token(data={"sub": user_data["email"]}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    print(f"Access token generated for user {user.email}.")
 
     return {"message": "Login Successful", "access_token": access_token, "token_type": "bearer"}
-
-
 
 # Protected Route
 @app.get("/protected/")
