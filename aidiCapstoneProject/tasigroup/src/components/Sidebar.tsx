@@ -1,75 +1,20 @@
-// import {
-//   Settings,
-//   Share2,
-//   Info,
-//   GraduationCap,
-//   ChevronRight,
-// } from "lucide-react";
-// import { Link } from "react-router-dom";
-
-// const Sidebar = () => {
-//   return (
-//     <div className="fixed left-0 top-20 h-[calc(100vh-5rem)] w-64 bg-white/80 backdrop-blur-md p-6 border-r border-gray-200 shadow-lg">
-//       <div className="space-y-4">
-//         <Link
-//           to="/tools"
-//           className="flex items-center justify-between p-3 hover:bg-blue-50 rounded-xl transition-all duration-300 group"
-//         >
-//           <div className="flex items-center space-x-3">
-//             <Settings className="h-5 w-5 text-blue-600" />
-//             <span className="font-medium text-gray-700">EVA TOOLS</span>
-//           </div>
-//           <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-600 transform group-hover:translate-x-1 transition-transform" />
-//         </Link>
-
-//         <Link
-//           to="/share"
-//           className="flex items-center justify-between p-3 hover:bg-green-50 rounded-xl transition-all duration-300 group"
-//         >
-//           <div className="flex items-center space-x-3">
-//             <Share2 className="h-5 w-5 text-green-600" />
-//             <span className="font-medium text-gray-700">SHARE THE EVA</span>
-//           </div>
-//           <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-green-600 transform group-hover:translate-x-1 transition-transform" />
-//         </Link>
-
-//         <Link
-//           to="/intro"
-//           className="flex items-center justify-between p-3 hover:bg-purple-50 rounded-xl transition-all duration-300 group"
-//         >
-//           <div className="flex items-center space-x-3">
-//             <Info className="h-5 w-5 text-purple-600" />
-//             <span className="font-medium text-gray-700">EVA INTRO</span>
-//           </div>
-//           <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-purple-600 transform group-hover:translate-x-1 transition-transform" />
-//         </Link>
-
-//         <Link
-//           to="/upgrade"
-//           className="flex items-center justify-between p-3 mt-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5"
-//         >
-//           <div className="flex items-center space-x-3">
-//             <GraduationCap className="h-5 w-5" />
-//             <span className="font-medium">UPGRADE</span>
-//           </div>
-//           <ChevronRight className="h-4 w-4" />
-//         </Link>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default Sidebar;
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import {
-  Settings,
-  Share2,
-  Info,
-  GraduationCap,
+  HelpCircle,
+  DollarSign,
+  BookOpen,
+  FileBarChart,
+  MessageCircle,
   ChevronRight,
-} from "lucide-react";
-import { Link } from "react-router-dom";
+  Shield,
+  FileText,
+} from 'lucide-react';
 
 const Sidebar = () => {
+  const location = useLocation();
+  const isAuthenticated = !!localStorage.getItem("user_id");
+
   return (
     <div className="fixed left-0 top-0 h-screen w-64 bg-gradient-to-b from-gray-900 to-gray-800 border-r border-gray-700 shadow-2xl backdrop-blur-lg p-6 rounded-r-xl transition-all duration-500">
       {/* Logo / Title */}
@@ -77,66 +22,100 @@ const Sidebar = () => {
         EVA Tools
       </h1>
 
-      <div className="space-y-6">
-        {/* Sidebar Item Component */}
-        <SidebarItem
-          to="/tools"
-          icon={
-            <Settings className="h-6 w-6 text-blue-400 group-hover:text-white transition-all" />
-          }
-          title="EVA TOOLS"
-          color="from-blue-600 to-cyan-500"
-        />
+      {/* Flex container to push content to the bottom */}
+      <div className="flex flex-col justify-between h-[calc(100vh-8rem)]">
+        {/* Top Section: Sidebar Items */}
+        <div className="space-y-6">
+          {/* How EVA Works */}
+          <SidebarItem
+            to="/how-eva-works"
+            icon={<HelpCircle className="h-6 w-6 text-blue-400 group-hover:text-white transition-all" />}
+            title="How EVA Works"
+            color="from-blue-600 to-cyan-500"
+            isActive={location.pathname === '/how-eva-works'}
+          />
 
-        <SidebarItem
-          to="/share"
-          icon={
-            <Share2 className="h-6 w-6 text-green-400 group-hover:text-white transition-all" />
-          }
-          title="SHARE THE EVA"
-          color="from-green-600 to-teal-500"
-        />
+          {/* Pricing */}
+          <SidebarItem
+            to="/pricing"
+            icon={<DollarSign className="h-6 w-6 text-green-400 group-hover:text-white transition-all" />}
+            title="Pricing"
+            color="from-green-600 to-teal-500"
+            isActive={location.pathname === '/pricing'}
+          />
 
-        <SidebarItem
-          to="/intro"
-          icon={
-            <Info className="h-6 w-6 text-purple-400 group-hover:text-white transition-all" />
-          }
-          title="EVA INTRO"
-          color="from-purple-600 to-pink-500"
-        />
+          {/* Prompt Library */}
+          <SidebarItem
+            to="/prompt-library"
+            icon={<BookOpen className="h-6 w-6 text-purple-400 group-hover:text-white transition-all" />}
+            title="Prompt Library"
+            color="from-purple-600 to-pink-500"
+            isActive={location.pathname === '/prompt-library'}
+          />
 
-        {/* Upgrade Button */}
-        <Link
-          to="/upgrade"
-          className="flex items-center justify-between p-4 mt-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-white shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 transform hover:scale-105"
-        >
-          <div className="flex items-center space-x-3">
-            <GraduationCap className="h-6 w-6" />
-            <span className="font-semibold tracking-wide">UPGRADE</span>
-          </div>
-          <ChevronRight className="h-5 w-5" />
-        </Link>
+          {/* Report Card */}
+          <SidebarItem
+            to="/report-card"
+            icon={<FileBarChart className="h-6 w-6 text-yellow-400 group-hover:text-white transition-all" />}
+            title="Report Card"
+            color="from-yellow-600 to-orange-500"
+            isActive={location.pathname === '/report-card'}
+          />
+
+          {/* Chat Room (Visible only when authenticated) */}
+          {isAuthenticated && (
+            <SidebarItem
+              to="/chat-room"
+              icon={<MessageCircle className="h-6 w-6 text-blue-400 group-hover:text-white transition-all" />}
+              title="Chat Room"
+              color="from-blue-600 to-purple-600"
+              isActive={location.pathname === '/chat-room'}
+            />
+          )}
+        </div>
+
+        {/* Bottom Section: Privacy Policy and Terms of Service Links */}
+        <div className="space-y-4">
+          <Link
+            to="/privacy-policy"
+            className={`flex items-center justify-between p-3 rounded-xl ${location.pathname === '/privacy-policy' ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white' : 'bg-gray-800/30 text-gray-300'} shadow-md hover:shadow-lg transition-all duration-300`}
+          >
+            <div className="flex items-center space-x-3">
+              <Shield className="h-5 w-5" />
+              <span className="font-medium tracking-wide">Privacy Policy</span>
+            </div>
+            <ChevronRight className="h-5 w-5" />
+          </Link>
+
+          <Link
+            to="/terms-of-service"
+            className={`flex items-center justify-between p-3 rounded-xl ${location.pathname === '/terms-of-service' ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white' : 'bg-gray-800/30 text-gray-300'} shadow-md hover:shadow-lg transition-all duration-300`}
+          >
+            <div className="flex items-center space-x-3">
+              <FileText className="h-5 w-5" />
+              <span className="font-medium tracking-wide">Terms of Service</span>
+            </div>
+            <ChevronRight className="h-5 w-5" />
+          </Link>
+        </div>
       </div>
     </div>
   );
 };
 
 /* Sidebar Item Component */
-const SidebarItem = ({ to, icon, title, color }) => {
+const SidebarItem = ({ to, icon, title, color, isActive }) => {
   return (
     <Link
       to={to}
       className={`group flex items-center justify-between p-4 rounded-xl transition-all duration-300 
-      bg-gray-800/30 hover:bg-gradient-to-r ${color} shadow-md hover:shadow-lg`}
+      ${isActive ? `bg-gradient-to-r ${color} text-white` : 'bg-gray-800/30 text-gray-300'} shadow-md hover:shadow-lg`}
     >
       <div className="flex items-center space-x-4">
         {icon}
-        <span className="font-medium text-gray-300 group-hover:text-white tracking-wide">
-          {title}
-        </span>
+        <span className="font-medium tracking-wide">{title}</span>
       </div>
-      <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-white transition-all" />
+      <ChevronRight className="h-5 w-5" />
     </Link>
   );
 };
