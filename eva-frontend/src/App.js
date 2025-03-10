@@ -11,6 +11,9 @@ function App() {
   const chatWindowRef = useRef(null);
   const user_id = "user123"; // Replace with the actual user ID
 
+  // Use environment variable for API URL
+  const API_URL = process.env.REACT_APP_API_URL;
+
   const sendMessage = async (message) => {
     if (!message.trim()) return;
 
@@ -20,7 +23,7 @@ function App() {
     setIsLoading(true);
 
     try {
-      const response = await axios.post("http://localhost:8000/chat/", {
+      const response = await axios.post(`${API_URL}/chat/`, {
         question: message,
         user_id: user_id,
       });
@@ -39,12 +42,10 @@ function App() {
 
   const startNewChat = async () => {
     try {
-      // Call the backend to start a new chat session
-      await axios.post("http://localhost:8000/new_chat/", {
+      await axios.post(`${API_URL}/new_chat/`, {
         user_id: user_id,
       });
 
-      // Clear the chat window
       setMessages([]);
     } catch (error) {
       console.error("Error starting new chat:", error);
@@ -53,9 +54,9 @@ function App() {
 
   const loadChatSession = async (sessionId) => {
     try {
-      const response = await axios.get(`http://localhost:8000/chat_session/${sessionId}`);
+      const response = await axios.get(`${API_URL}/chat_session/${sessionId}`);
       const session = response.data.session;
-      setMessages(session.messages); // Update the chat window with the loaded session
+      setMessages(session.messages);
     } catch (error) {
       console.error("Error loading chat session:", error);
     }
