@@ -7,6 +7,8 @@ const Login = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate(); // Hook for navigation
 
+  const API_URL = 'http://localhost:8000'
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(''); // Reset any previous errors
@@ -14,7 +16,7 @@ const Login = () => {
     const loginData = { email, password };
 
     try {
-      const response = await fetch('http://localhost:8000/login/', {
+      const response = await fetch(`${API_URL}/login/`, {
         method: 'POST',
         headers: {
           "Content-Type": "application/json",

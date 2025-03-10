@@ -11,30 +11,37 @@ const SignUp = () => {
   const [success, setSuccess] = useState('');
   const navigate = useNavigate(); // Redirect after signup
 
+  const API_URL = 'http://localhost:8000';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-
+  
     try {
-      const response = await axios.post('http://localhost:8000/signup/', {
+      console.log('Sending signup request:', { name, email, password });
+
+      const response = await axios.post(`${API_URL}/signup/`, {
         name,
         email,
         password,
       });
-
+  
+      console.log('Signup response:', response.data); // Debugging
+  
       // Store JWT token in localStorage
       localStorage.setItem('token', response.data.access_token);
-
+  
       setSuccess(response.data.message);
       console.log('Signup successful:', response.data);
-
+  
       // Redirect to dashboard or login page
       setTimeout(() => {
         navigate('/login');  // Redirect to dashboard after signup
       }, 1000);
-
+  
     } catch (err: any) {
+      console.error('Signup error:', err.response?.data || err.message); // Debugging
       setError(err.response?.data?.detail || 'Signup failed. Please try again.');
     }
   };

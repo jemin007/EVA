@@ -38,9 +38,13 @@ class Settings(BaseSettings):
     document_dir: str = os.path.join(os.path.dirname(__file__), "generated_documents")
     max_file_age_hours: int = 24
     log_level: str = "INFO"
+    google_application_credentials: str
+    api_base_url: str
+    react_app_api_base_url: str
 
     class Config:
         env_file = ".env"
+        extra = 'allow'
 
 
 settings = Settings()
@@ -59,6 +63,7 @@ app = FastAPI()
 # Add CORS middleware
 allowed_origins = [
     "http://localhost:5173",
+    "http://localhost:8000",
     "https://evatool.ai/"
 ]
 
@@ -185,13 +190,17 @@ def create_access_token(data: dict, expires_delta: timedelta):
 
 @app.post("/signup/")
 async def signup(user: UserSignup):
+    print(f"Received signup request for email: {user.email}")  # Debugging
+
     user_ref = db.collection("users").document(user.email)
     
     # Check if user already exists
     if user_ref.get().exists:
+        print(f"User with email {user.email} already exists.")  # Debugging
         raise HTTPException(status_code=400, detail="Email already registered")
 
     hashed_password = hash_password(user.password)
+    print(f"Hashed password: {hashed_password}")  # Debugging
     
     # Save user data in Firestore
     user_ref.set({
@@ -200,10 +209,12 @@ async def signup(user: UserSignup):
         "hashed_password": hashed_password
     })
 
+    print(f"User {user.email} saved to Firestore.")  # Debugging
+
     access_token = create_access_token(data={"sub": user.email}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    print(f"Access token generated: {access_token}")  # Debugging
 
     return {"message": "User registered successfully", "access_token": access_token, "token_type": "bearer"}
-
 
 # Login Route
 @app.post("/login/")
