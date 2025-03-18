@@ -8,7 +8,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const token = localStorage.getItem("access_token");
+      const token = localStorage.getItem("token");
       if (!token) {
         console.error("No token found, redirecting to login...");
         navigate("/login");

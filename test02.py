@@ -31,12 +31,13 @@ from supabase import create_client, Client
 load_dotenv()
 
 # Initialize Supabase client
-supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_KEY")
-supabase: Client = Depends(create_client(supabase_url, supabase_key))
+SUPABASE_URL = "https://hfvcvaghaarypglwxktp.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmdmN2YWdoYWFyeXBnbHd4a3RwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMzEyMzksImV4cCI6MjA1NzgwNzIzOX0.z5SVtyRrmgD-LvSXvOQq4T16DpmRM7sBbptrAfQLvMs"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Password Hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 # Configuration using environment variables
 class Settings(BaseModel):
@@ -44,6 +45,7 @@ class Settings(BaseModel):
     document_dir: str = os.path.join(os.path.dirname(__file__), "generated_documents")
     max_file_age_hours: int = 24
     log_level: str = "INFO"
+
 
 settings = Settings(
     groq_api_key=os.getenv("GROQ_API_KEY"),
@@ -109,26 +111,32 @@ conversation = LLMChain(
 DOCUMENT_DIR = settings.document_dir
 os.makedirs(DOCUMENT_DIR, exist_ok=True)
 
+
 # Pydantic Models
 class Query(BaseModel):
     question: str
     user_id: str
 
+
 class DocumentRequest(BaseModel):
     user_id: str
+
 
 class UserSignup(BaseModel):
     name: str
     email: str
     password: str
 
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+
 # Utility Functions
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -171,6 +179,7 @@ async def get_user(credentials: HTTPAuthorizationCredentials = Depends(security)
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
 
+
 # Authentication Endpoints
 @app.post("/signup/")
 async def signup(user: UserSignup):
@@ -197,6 +206,7 @@ async def signup(user: UserSignup):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @app.post("/login/")
 async def login(user: UserLogin):
     try:
@@ -213,6 +223,7 @@ async def login(user: UserLogin):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.get("/protected/")
 async def protected_route(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -236,7 +247,8 @@ async def protected_route(credentials: HTTPAuthorizationCredentials = Depends(se
     except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-#@app.post("/chat/")
+
+@app.post("/chat/")
 async def chat(query: Query):
     user_question = query.question
     user_id = query.user_id
@@ -263,7 +275,9 @@ async def chat(query: Query):
             state = state_data.data[0]
 
         # Fetch or initialize current chat session
-        session_data = supabase.table("chat_sessions").select("*").eq("user_id", user_id).order("created_at", desc="true").limit(1).execute()
+        session_data = supabase.table("chat_sessions").select("*").eq("user_id", user_id).order("created_at",
+                                                                                                desc="true").limit(
+            1).execute()
         if not session_data.data:
             current_session = {
                 "id": str(uuid4()),
@@ -312,6 +326,7 @@ async def chat(query: Query):
         logging.error(f"Error during chat processing: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
+
 # Document Generation Endpoint
 @app.post("/generate_document/")
 async def generate_document(request: DocumentRequest):
@@ -323,17 +338,21 @@ async def generate_document(request: DocumentRequest):
         raise HTTPException(status_code=404, detail="User not found")
 
     # Fetch the latest conversation
-    last_conversation = supabase.table("conversations").select("*").eq("user_id", user_id).order("timestamp", desc=True).limit(1).execute()
+    last_conversation = supabase.table("conversations").select("*").eq("user_id", user_id).order("timestamp",
+                                                                                                 desc=True).limit(
+        1).execute()
     if not last_conversation.data:
         raise HTTPException(status_code=400, detail="No conversation available for this user")
 
     last_conversation_data = last_conversation.data[0]
-    filepath = await create_word_document(user_id, last_conversation_data["question"], last_conversation_data["response"])
+    filepath = await create_word_document(user_id, last_conversation_data["question"],
+                                          last_conversation_data["response"])
 
     await cleanup_old_files()
 
     return FileResponse(filepath, filename=os.path.basename(filepath),
                         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
 
 # Utility Functions for Document Generation
 async def create_word_document(user_id: str, questions: str, response: str) -> str:
@@ -364,6 +383,7 @@ async def create_word_document(user_id: str, questions: str, response: str) -> s
     doc.save(filepath)
     return filepath
 
+
 async def cleanup_old_files(max_age_hours: int = settings.max_file_age_hours):
     current_time = datetime.now()
     for filename in os.listdir(DOCUMENT_DIR):
@@ -373,7 +393,9 @@ async def cleanup_old_files(max_age_hours: int = settings.max_file_age_hours):
             await aiofiles.os.remove(file_path)
             logging.info(f"Removed old file: {filename}")
 
+
 # Run the Application
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
