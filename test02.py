@@ -31,8 +31,8 @@ from supabase import create_client, Client
 load_dotenv()
 
 # Initialize Supabase client
-supabase_url = "https://hfvcvaghaarypglwxktp.supabase.co"
-supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmdmN2YWdoYWFyeXBnbHd4a3RwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMzEyMzksImV4cCI6MjA1NzgwNzIzOX0.z5SVtyRrmgD-LvSXvOQq4T16DpmRM7sBbptrAfQLvMs"
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_KEY")
 supabase: Client = Depends(create_client(supabase_url, supabase_key))
 
 # Password Hashing
