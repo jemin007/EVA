@@ -1,21 +1,24 @@
-import React, { useState } from 'react';
-import { Mail, Lock } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Mail, Lock } from "lucide-react";
+
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const navigate = useNavigate(); // Hook for navigation
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false); // Added loading state
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); // Reset any previous errors
+    setError("");
+    setIsLoading(true); // Set loading state to true
 
     const loginData = { email, password };
 
     try {
-      const response = await fetch('http://localhost:8000/login/', {
-        method: 'POST',
+      const response = await fetch("http://localhost:8000/login/", {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
@@ -25,23 +28,26 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok) {
-        console.log('Login successful:', data);
+        console.log("Login successful:", data);
 
-        // Store user information in localStorage
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user_id', data.user_id); // Store user_id
-        localStorage.setItem('username', data.username); // Store username
-        localStorage.setItem('email', data.email); // Store email
-        console.log("Stored user_id:", localStorage.getItem("user_id"));//check
+        // Store token and user data in localStorage
+        localStorage.setItem("token", data.access_token);
+        localStorage.setItem("user", JSON.stringify({
+          userId: data.user_id, // Fixed: Use `user_id` instead of `data.user_id`
+          email: data.email,    // Fixed: Use `email` directly from `data`
+        }));
 
-        // Redirect user to the dashboard
+        // Redirect to the dashboard
         navigate("/dashboard");
       } else {
-        setError(data.detail || 'Login failed. Please check your credentials.');
+        // Handle backend errors
+        setError(data.detail || "Login failed. Please check your credentials.");
       }
     } catch (error) {
-      console.error('Error:', error);
-      setError('An error occurred. Please try again.');
+      console.error("Error:", error);
+      setError("An error occurred. Please try again.");
+    } finally {
+      setIsLoading(false); // Reset loading state
     }
   };
 
@@ -105,25 +111,26 @@ const Login = () => {
                   Remember me
                 </label>
               </div>
-              <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-500">
+              <a href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-500">
                 Forgot password?
-              </Link>
+              </a>
             </div>
 
             <button
               type="submit"
               className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              disabled={isLoading} // Disable button when loading
             >
-              Sign In
+              {isLoading ? "Signing In..." : "Sign In"}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link to="/signup" className="text-blue-600 hover:text-blue-500 font-medium">
+              Don't have an account?{" "}
+              <a href="/signup" className="text-blue-600 hover:text-blue-500 font-medium">
                 Sign up
-              </Link>
+              </a>
             </p>
           </div>
         </div>

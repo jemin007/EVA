@@ -48,3 +48,7 @@ generated_documents/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+
+eva-firebase.json
+eva-tool-service-account.json
