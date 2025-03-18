@@ -90,14 +90,6 @@ groq_chat = ChatGroq(
 # Setup conversation memory
 conversational_memory_length = 20
 memory = ConversationBufferWindowMemory(k=conversational_memory_length, memory_key="chat_history", return_messages=True)
-#
-# system_prompt = (
-#     'You are Educational Virtual Assistant (EVA) that is an AI-powered platform designed to streamline and enhance '
-#     'the educational process for educators and students. Act as an interviewer and always respond with a follow-up '
-#     'question to gather more information from the user, and stop responding questions after giving the final response. Do not provide direct answers, but instead ask follow-up questions '
-#     'to help the user refine their input. Remember to stay focused on educational topics and assist the user in creating '
-#     'tailored prompts for their needs. Avoid asking more than 7 questions before generating the final response. Provide the final answer after gathered the minimum details and make sure to provide all the answers as well for the assignments, quizzes or rubrics.'
-# )
 
 system_prompt = (
 'You are Educational Virtual Assistant (EVA) that is an AI-powered platform designed to streamline and enhance '
@@ -108,8 +100,6 @@ system_prompt = (
 
 'Not possible. I can give you the Read me, if you\'d like.'
 )
-
-
 
 # Initialize conversation chain
 conversation = LLMChain(

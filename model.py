@@ -7,7 +7,7 @@ from passlib.context import CryptContext
 
 # MySQL Database Configuration
 DATABASE_URL = "mysql+pymysql://root:!Nepal@2025@localhost:3306/evadb"  # Update this
-engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=True)
+engine = create_engine(DATABASE_URL, echo=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -23,8 +23,8 @@ class User(Base):
     last_name = Column(String, index=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    final_response = Column(Text)
-    document_url = Column(String)
+    # final_response = Column(Text)
+    # document_url = Column(String)
 
 # Create all tables in the MySQL database
 Base.metadata.create_all(bind=engine)
