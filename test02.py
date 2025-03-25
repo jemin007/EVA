@@ -62,7 +62,11 @@ security = HTTPBearer()
 
 # Add CORS middleware
 allowed_origins = [
-    "http://localhost:5173",
+    # "http://localhost:5173",
+    "http://localhost:5174",
+
+    # "http://localhost:3000",
+
 ]
 
 app.add_middleware(
@@ -165,6 +169,7 @@ async def get_user(credentials: HTTPAuthorizationCredentials = Depends(security)
 
         # Fetch user data from the database
         user_data = supabase.table("users").select("*").eq("id", user_id).execute()
+        print(user_data)
 
         # Check if the user exists
         if not user_data.data or len(user_data.data) == 0:

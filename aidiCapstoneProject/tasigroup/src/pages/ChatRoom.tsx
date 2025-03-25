@@ -1,6 +1,4 @@
-// pages/ChatRoom.tsx
-import React, { useState, useEffect } from "react";
-import { useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Send, Download, Sparkles, Bot, User, FileSpreadsheet, Brain, BookOpen } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 
@@ -15,19 +13,26 @@ const ChatRoom: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [userId, setUserId] = useState<string>("");
 
-  useEffect(() => {
-    const storedUserId = localStorage.getItem("user_id");
-    if (!storedUserId) {
-      const newUserId = uuidv4();
-      localStorage.setItem("user_id", newUserId);
-      setUserId(newUserId);
-    } else {
-      setUserId(storedUserId);
-    }
-  }, []);
-
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => {
+  const storedUserId = localStorage.getItem("user");
+
+  if (!storedUserId) {
+    const newUserId = uuidv4();
+    localStorage.setItem("user_id", newUserId);  // ✅ Store only the UUID
+    setUserId(newUserId);
+  } else {
+    try {
+      const parsedUserId = JSON.parse(storedUserId);
+      setUserId(parsedUserId.userId || storedUserId);  // ✅ Handle both cases
+    } catch (error) {
+      setUserId(storedUserId);  // ✅ Already a valid string
+    }
+  }
+}, [])
+
+  // Scroll to the bottom of the chat when messages change
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -38,23 +43,42 @@ const ChatRoom: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Send a message to the backend
   const sendMessage = async (messageText: string) => {
-    const userId = localStorage.getItem("user_id") || uuidv4();
     if (!messageText.trim()) return;
+
+    // Add the user's message to the chat history
     const userMessage: Message = { sender: "user", text: messageText };
     setMessages((prev) => [...prev, userMessage]);
+
     setIsLoading(true);
+
     try {
+      console.log("Sending request to backend...");
       const response = await fetch("http://localhost:8000/chat/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json", // Some APIs require this
+        },
         body: JSON.stringify({ question: messageText, user_id: userId }),
       });
+
+      console.log("Received response from backend:", response);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
+      console.log("Response data:", data);
+
+      // Add the bot's response to the chat history
       const botMessage: Message = { sender: "bot", text: data.response };
       setMessages((prev) => [...prev, botMessage]);
     } catch (error) {
       console.error("Error sending message:", error);
+      // If there's an error, show an error message from the bot
       const errorMessage: Message = { sender: "bot", text: "Error: Unable to get a response." };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -62,29 +86,14 @@ const ChatRoom: React.FC = () => {
     }
   };
 
+  // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     sendMessage(message);
     setMessage("");
   };
 
-  const startNewChat = async () => {
-    try {
-      const response = await fetch("http://localhost:8000/new_chat/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId }),
-      });
-      const data = await response.json();
-      if (data.status === "success") {
-        setMessages([]);
-        console.log(data.message);
-      }
-    } catch (error) {
-      console.error("Error starting new chat:", error);
-    }
-  };
-
+  // Feature buttons
   const features = [
     {
       title: "Create an Assignment",
@@ -236,13 +245,6 @@ const ChatRoom: React.FC = () => {
               className="p-4 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
             >
               <Download className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={startNewChat}
-              className="px-6 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-xl hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 font-medium"
-            >
-              New Chat
             </button>
           </div>
         </form>
