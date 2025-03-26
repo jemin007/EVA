@@ -26,6 +26,7 @@ import aiofiles.os
 from passlib.context import CryptContext
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import create_client, Client
+from markdown import markdown
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -62,7 +63,7 @@ security = HTTPBearer()
 
 # Add CORS middleware
 allowed_origins = [
-    # "http://localhost:5173",
+    #"http://localhost:5173",
     "http://localhost:5174",
 
     # "http://localhost:3000",
@@ -82,20 +83,69 @@ model = 'llama-3.2-90b-vision-preview'
 groq_chat = ChatGroq(
     groq_api_key=settings.groq_api_key,
     model_name=model,
-    temperature=0.0
+    temperature=0.1
 )
 
 # Setup conversation memory
 conversational_memory_length = 20
 memory = ConversationBufferWindowMemory(k=conversational_memory_length, memory_key="chat_history", return_messages=True)
 
-system_prompt = (
-    'You are Educational Virtual Assistant (EVA) that is an AI-powered platform designed to streamline and enhance '
-    'the educational process for educators and students. Act as an interviewer and always respond with a follow-up '
-    'question to gather more information from the user, and stop responding questions after giving the final response. Do not provide direct answers, but instead ask follow-up questions '
-    'to help the user refine their input. Remember to stay focused on educational topics and assist the user in creating '
-    'tailored prompts for their needs. Avoid asking more than 7 questions before generating the final response. Provide the final answer after gathered the minimum details and make sure to provide all the answers as well for the assignments, quizzes or rubrics.'
-)
+system_prompt = """You are EVA, a friendly Academic Content Assistant. Use casual but professional English. Help users create academic materials through conversation, not interrogation.
+
+**Core Principles:**
+1. Start with short greeting ("Hi! How can I assist with your academic content?")
+2. First ask: "What would you like to create? (Course outline/Lesson plan/Assignment/Rubric/Grading system)" 
+3. Ask a maximum of 6 questions to provide final answer
+4. For each request:
+   - Identify the 2-3 MOST ESSENTIAL requirements needed to start
+   - Ask questions NATURALLY within conversation flow ("First, what's the main goal of this lesson?")
+   - Suggest common academic standards unless user specifies otherwise
+   - Never ask back-to-back questions
+
+**Special Handling:**
+- If user provides minimal info: "Would you like me to suggest standard components for [content type]?"
+- For vague requests: "Should we focus on [aspect A] or [aspect B] first?"
+- Off-topic: "I'm best at academic content - want help structuring something specific?"
+- Never say "good morning" repeatedly or use formal greetings after initial message
+
+**Response Style:**
+- Use contractions ("Let's", "We'll")
+- Keep responses under 2 sentences unless explaining complex concepts
+- Add occasional encouragement ("Good choice!", "Clear objective!")
+- Always leave conversation open-ended after responses
+
+ Always format responses using Markdown:
+
+**Formatting Rules:**
+1. Use headings for sections: `## Heading`
+2. Use bullet points for lists:
+   - Item 1
+   - Item 2
+3. Number steps:
+   1. First step
+   2. Second step
+4. Separate paragraphs with blank lines
+5. Use `**bold**` for emphasis
+6. Code blocks: ```python\nprint("Hello")\n```
+
+Example formatted response:
+## Lesson Plan Structure
+
+**Objective:**  
+Understand cellular biology
+
+**Key Topics:**
+- Cell structure
+- Organelle functions
+- Cell division
+
+**Activities:**
+1. Microscope lab
+2. Group discussion
+3. Quiz
+
+Never respond with unformatted paragraphs only.
+"""
 
 # Initialize conversation chain
 conversation = LLMChain(
@@ -152,7 +202,7 @@ class UserResponse:
         self.name = name
         self.email = email
 
-
+'''
 @app.get("/get_user/")
 async def get_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
@@ -183,7 +233,7 @@ async def get_user(credentials: HTTPAuthorizationCredentials = Depends(security)
         )
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
-
+'''
 
 # Authentication Endpoints
 @app.post("/signup/")
@@ -211,6 +261,55 @@ async def signup(user: UserSignup):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/reset_conversation")
+async def reset_conversation(query: Query):
+    try:
+        user_id = query.user_id
+
+        if not user_id:
+            raise HTTPException(status_code=400, detail="User ID is required")
+
+        # 1. Get current session ID before deletion
+        current_session = supabase.table("chat_sessions") \
+            .select("id") \
+            .eq("user_id", user_id) \
+            .order("created_at", desc=True) \
+            .limit(1) \
+            .execute()
+        
+        current_session_id = current_session.data[0]["id"] if current_session.data else None
+
+        # 2. Delete all related data
+        supabase.table("conversation_states").delete().eq("user_id", user_id).execute()
+        if current_session_id:
+            supabase.table("chat_messages").delete().eq("session_id", current_session_id).execute()
+            supabase.table("chat_sessions").delete().eq("id", current_session_id).execute()
+
+        # 3. Create fresh session and state
+        new_session_id = str(uuid4())
+        supabase.table("chat_sessions").insert([{
+            "id": new_session_id,
+            "user_id": user_id,
+            "title": "New Chat",
+            "created_at": datetime.utcnow().isoformat()
+        }]).execute()
+
+        supabase.table("conversation_states").insert([{
+            "user_id": user_id,
+            "conversation_turns": 0,
+            "conversation_data": []
+        }]).execute()
+
+        return {
+            "success": True,
+            "new_session_id": new_session_id,
+            "message": "Conversation reset successfully"
+        }
+
+    except Exception as e:
+        logging.error(f"Reset error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 
 @app.post("/login/")
 async def login(user: UserLogin):
@@ -323,7 +422,9 @@ async def chat(query: Query):
         }
         supabase.table("conversation_states").update(updated_state).eq("user_id", user_id).execute()
 
-        return {"response": response, "status": "success"}
+        html_response = markdown(response)
+
+        return {"response": html_response, "raw_response": response, "status": "success"}
 
     except HTTPException as e:
         raise e

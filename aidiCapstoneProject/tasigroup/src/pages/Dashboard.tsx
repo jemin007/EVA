@@ -17,7 +17,7 @@ const Dashboard = () => {
 
       try {
         console.log("Fetching user data...");
-        const response = await fetch("http://localhost:8000/get_user/", {
+        const response = await fetch("http://localhost:8000/chat/", {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,

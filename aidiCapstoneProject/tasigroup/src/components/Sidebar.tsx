@@ -13,7 +13,7 @@ import {
 
 const Sidebar = () => {
   const location = useLocation();
-  const isAuthenticated = !!localStorage.getItem("user_id");
+  const isAuthenticated = !!localStorage.getItem("token"); // Check for token instead of user_id
 
   return (
     <div className="fixed left-0 top-0 h-screen w-64 bg-gradient-to-b from-gray-900 to-gray-800 border-r border-gray-700 shadow-2xl backdrop-blur-lg p-6 rounded-r-xl transition-all duration-500">

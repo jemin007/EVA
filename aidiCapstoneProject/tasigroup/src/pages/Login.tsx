@@ -38,7 +38,7 @@ const Login = () => {
         }));
 
         // Redirect to the dashboard
-        navigate("/dashboard");
+        navigate("/chat-room");
       } else {
         // Handle backend errors
         setError(data.detail || "Login failed. Please check your credentials.");

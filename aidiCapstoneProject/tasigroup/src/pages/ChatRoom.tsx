@@ -1,10 +1,36 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Send, Download, Sparkles, Bot, User, FileSpreadsheet, Brain, BookOpen } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Message {
   sender: string;
   text: string;
+  isMarkdown?: boolean;
+}
+
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("Error caught by boundary:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div className="p-4 text-red-500">Something went wrong. Please refresh the page.</div>;
+    }
+
+    return this.props.children;
+  }
 }
 
 const ChatRoom: React.FC = () => {
@@ -16,23 +42,27 @@ const ChatRoom: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-  const storedUserId = localStorage.getItem("user");
+    const storedUserId = localStorage.getItem("user");
 
-  if (!storedUserId) {
-    const newUserId = uuidv4();
-    localStorage.setItem("user_id", newUserId);  // ✅ Store only the UUID
-    setUserId(newUserId);
-  } else {
-    try {
-      const parsedUserId = JSON.parse(storedUserId);
-      setUserId(parsedUserId.userId || storedUserId);  // ✅ Handle both cases
-    } catch (error) {
-      setUserId(storedUserId);  // ✅ Already a valid string
+    if (!storedUserId) {
+      const newUserId = uuidv4();
+      localStorage.setItem("user_id", newUserId);
+      setUserId(newUserId);
+    } else {
+      try {
+        const parsedUserId = JSON.parse(storedUserId);
+        setUserId(parsedUserId.userId || storedUserId);
+      } catch (error) {
+        setUserId(storedUserId);
+      }
     }
-  }
-}, [])
 
-  // Scroll to the bottom of the chat when messages change
+    const storedMessages = localStorage.getItem("chatMessages");
+    if (storedMessages) {
+      setMessages(JSON.parse(storedMessages));
+    }
+  }, []);
+
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -43,57 +73,74 @@ const ChatRoom: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Send a message to the backend
   const sendMessage = async (messageText: string) => {
     if (!messageText.trim()) return;
 
-    // Add the user's message to the chat history
     const userMessage: Message = { sender: "user", text: messageText };
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => {
+      const updatedMessages = [...prev, userMessage];
+      localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+      return updatedMessages;
+    });
 
     setIsLoading(true);
 
     try {
-      console.log("Sending request to backend...");
       const response = await fetch("http://localhost:8000/chat/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json", // Some APIs require this
+          "Accept": "application/json",
         },
         body: JSON.stringify({ question: messageText, user_id: userId }),
       });
-
-      console.log("Received response from backend:", response);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log("Response data:", data);
-
-      // Add the bot's response to the chat history
-      const botMessage: Message = { sender: "bot", text: data.response };
-      setMessages((prev) => [...prev, botMessage]);
+      const botMessage: Message = { 
+        sender: "bot", 
+        text: data.response,
+        isMarkdown: true 
+      };
+      
+      setMessages((prev) => {
+        const updatedMessages = [...prev, botMessage];
+        localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
+        return updatedMessages;
+      });
     } catch (error) {
       console.error("Error sending message:", error);
-      // If there's an error, show an error message from the bot
-      const errorMessage: Message = { sender: "bot", text: "Error: Unable to get a response." };
+      const errorMessage: Message = { 
+        sender: "bot", 
+        text: "Error: Unable to get a response." 
+      };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     sendMessage(message);
     setMessage("");
   };
 
-  // Feature buttons
+  const handleNewChat = () => {
+    setMessages([]);
+    localStorage.removeItem("chatMessages");
+    fetch("http://localhost:8000/reset_conversation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ user_id: userId }),
+    }).catch((error) => console.error("Error resetting conversation:", error));
+  };
+
   const features = [
     {
       title: "Create an Assignment",
@@ -121,7 +168,6 @@ const ChatRoom: React.FC = () => {
   return (
     <div className="min-h-screen pt-20 pl-64 bg-gradient-to-r from-indigo-100 to-blue-50">
       <div className="max-w-6xl mx-auto p-8">
-        {/* Feature Buttons */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
           {features.map((feature, index) => (
             <button
@@ -155,7 +201,6 @@ const ChatRoom: React.FC = () => {
           ))}
         </div>
 
-        {/* Chat Messages */}
         <div className="pb-48">
           <div className="space-y-6">
             {messages.map((msg, index) => (
@@ -187,7 +232,34 @@ const ChatRoom: React.FC = () => {
                     <p className={`text-sm font-medium mb-1 ${msg.sender === "user" ? "text-blue-100" : "text-indigo-600"}`}>
                       {msg.sender === "user" ? "You" : "EVA"}
                     </p>
-                    <p className={`${msg.sender === "user" ? "" : "text-gray-700"}`}>{msg.text}</p>
+                    <ErrorBoundary>
+                      {msg.isMarkdown ? (
+                        <div className="markdown-content">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              h1: ({node, ...props}) => <h1 style={{fontSize: '1.5rem', fontWeight: 'bold', margin: '0.5rem 0'}} {...props} />,
+                              h2: ({node, ...props}) => <h2 style={{fontSize: '1.25rem', fontWeight: 'bold', margin: '0.5rem 0'}} {...props} />,
+                              h3: ({node, ...props}) => <h3 style={{fontSize: '1.1rem', fontWeight: 'bold', margin: '0.3rem 0'}} {...props} />,
+                              p: ({node, ...props}) => <p style={{margin: '0.5rem 0'}} {...props} />,
+                              ul: ({node, ...props}) => <ul style={{listStyleType: 'disc', paddingLeft: '1.5rem', margin: '0.5rem 0'}} {...props} />,
+                              ol: ({node, ...props}) => <ol style={{listStyleType: 'decimal', paddingLeft: '1.5rem', margin: '0.5rem 0'}} {...props} />,
+                              li: ({node, ...props}) => <li style={{margin: '0.25rem 0'}} {...props} />,
+                              strong: ({node, ...props}) => <strong style={{fontWeight: 'bold'}} {...props} />,
+                              a: ({node, ...props}) => <a style={{color: '#3b82f6', textDecoration: 'underline'}} {...props} />,
+                              code: ({node, ...props}) => <code style={{backgroundColor: '#f3f4f6', padding: '0.2rem 0.4rem', borderRadius: '0.25rem'}} {...props} />,
+                              pre: ({node, ...props}) => <pre style={{backgroundColor: '#f3f4f6', padding: '1rem', borderRadius: '0.5rem', overflowX: 'auto'}} {...props} />
+                            }}
+                          >
+                            {msg.text}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className={`${msg.sender === "user" ? "" : "text-gray-700"}`}>
+                          {msg.text}
+                        </p>
+                      )}
+                    </ErrorBoundary>
                   </div>
                 </div>
                 {msg.sender === "user" && (
@@ -220,7 +292,6 @@ const ChatRoom: React.FC = () => {
         </div>
       </div>
 
-      {/* Chat Input */}
       <div className="fixed bottom-0 left-64 right-0 p-6 bg-white/90 backdrop-blur-md border-t border-gray-200 shadow-lg">
         <form onSubmit={handleSubmit} className="flex items-center space-x-3 max-w-5xl mx-auto">
           <div className="relative flex-1">
@@ -245,6 +316,13 @@ const ChatRoom: React.FC = () => {
               className="p-4 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
             >
               <Download className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleNewChat}
+              className="p-4 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            >
+              New Chat
             </button>
           </div>
         </form>

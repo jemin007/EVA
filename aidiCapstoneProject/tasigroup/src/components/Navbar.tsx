@@ -1,9 +1,16 @@
-import { useState } from "react";
+import React from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { GraduationCap, Menu, X } from "lucide-react";
-import { Link } from "react-router-dom";
 
 const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const isAuthenticated = !!localStorage.getItem("token");
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    navigate("/login");
+  };
 
   return (
     <nav className="bg-white/90 backdrop-blur-md fixed w-full z-50 shadow-lg">
@@ -35,18 +42,29 @@ const Navbar = () => {
               >
                 ABOUT US
               </Link>
-              <Link
-                to="/login"
-                className="text-gray-700 hover:text-blue-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Login
-              </Link>
-              <Link
-                to="/signup"
-                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
-              >
-                Sign Up
-              </Link>
+              {isAuthenticated ? (
+                <button
+                  onClick={handleLogout}
+                  className="text-gray-700 hover:text-blue-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Logout
+                </button>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="text-gray-700 hover:text-blue-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/signup"
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+                  >
+                    Sign Up
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 
@@ -81,18 +99,29 @@ const Navbar = () => {
             >
               ABOUT US
             </Link>
-            <Link
-              to="/login"
-              className="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-            >
-              Login
-            </Link>
-            <Link
-              to="/signup"
-              className="block px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg"
-            >
-              Sign Up
-            </Link>
+            {isAuthenticated ? (
+              <button
+                onClick={handleLogout}
+                className="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                Logout
+              </button>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  className="block px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}
