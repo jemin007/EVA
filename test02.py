@@ -62,8 +62,8 @@ security = HTTPBearer()
 
 # Add CORS middleware
 allowed_origins = [
-    # "http://localhost:5173",
-    "http://localhost:5174",
+    "http://localhost:5173",
+    # "http://localhost:5174",
 
     # "http://localhost:3000",
 
@@ -78,7 +78,9 @@ app.add_middleware(
 )
 
 # Initialize Groq client
-model = 'llama-3.2-90b-vision-preview'
+#odel = 'llama-3.2-90b-vision-preview'
+model = "llama-3.3-70b-versatile"
+
 groq_chat = ChatGroq(
     groq_api_key=settings.groq_api_key,
     model_name=model,
