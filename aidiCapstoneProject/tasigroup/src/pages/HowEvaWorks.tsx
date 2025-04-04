@@ -27,7 +27,7 @@ const HowEvaWorks: React.FC = () => {
           <div className="relative aspect-video rounded-2xl overflow-hidden shadow-lg">
             <iframe
               className="w-full h-full"
-              src="https://www.youtube.com/embed/dQw4w9WgXcQ" // Replace with your YouTube video link
+              src="https://www.youtube.com/embed/9syntOCtVcE?si=zvGaZeKMVADciw6R" // Replace with your YouTube video link
               title="How EVA Works"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
