@@ -1,75 +1,176 @@
-<<<<<<< HEAD
-# EVA-2
-Updated the previous EVA as per client....
-=======
-# Getting Started with Create React App
+# EVA - Academic Content Assistant
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+EVA is an intelligent academic content assistant that helps users create various types of academic materials through natural conversation. Built with FastAPI and powered by Groq's LLM, EVA provides a user-friendly interface for generating course outlines, lesson plans, assignments, rubrics, and grading systems.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- 🤖 AI-powered academic content generation
+- 📝 Document creation in Word format
+- 🔐 Secure user authentication
+- 💬 Natural conversation interface
+- 📚 Support for multiple academic content types
+- 🔄 Conversation history management
+- 🎯 Customizable academic standards
+- 🎨 Modern and responsive user interface
 
-### `npm start`
+## Tech Stack
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Backend
+- **Framework**: FastAPI
+- **Authentication**: Supabase
+- **AI Model**: Groq (llama-3.2-90b-vision-preview)
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
 
-### `npm test`
+### Frontend
+- **Framework**: React with TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **Routing**: React Router
+- **HTTP Client**: Axios
+- **Markdown Support**: React Markdown
+- **UI Components**: Lucide React
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Prerequisites
 
-### `npm run build`
+- Python 3.8+
+- Node.js 18+
+- Groq API Key
+- Supabase Account
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Installation
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Backend Setup
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+1. Clone the repository:
+```bash
+git clone https://github.com/jemin007/EVA
+```
 
-### `npm run eject`
+2. Create and activate a virtual environment:
+```bash
+python -m venv tgenv
+source tgenv/bin/activate  # On Windows: tgenv\Scripts\activate
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+4. Set up environment variables:
+Create a `.env` file in the root directory with the following variables:
+```env
+GROQ_API_KEY=your_groq_api_key
+DOCUMENT_DIR="documents"
+supabase_url = your_subase_url
+supabase_key = "your_supabase_key
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Frontend Setup
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+1. Navigate to the frontend directory:
+```bash
+cd aidiCapstoneProject/tasigroup
+```
 
-## Learn More
+2. Install dependencies:
+```bash
+npm install
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+npm build
 
-To learn React, check out the [React documentation](https://reactjs.org/).
 
-### Code Splitting
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+3. Create a `.env` file in the frontend directory:
+```env
+VITE_API_URL=http://localhost:8000
+```
 
-### Analyzing the Bundle Size
+## Project Structure
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+```
+.
+├── main.py              # Main FastAPI application
+├── requirements.txt     # Backend dependencies
+├── .env                 # Backend environment variables
+├── generated_documents/ # Generated Word documents
+├── aidiCapstoneProject/
+│   └── tasigroup/      # Frontend project
+│       ├── src/        # Source files
+│       ├── public/     # Static assets
+│       ├── dist/       # Build output
+│       └── package.json # Frontend dependencies
+└── documents/          # Additional documentation
+```
 
-### Making a Progressive Web App
+## Running the Application
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+### Backend
+```bash
+python main.py --run
 
-### Advanced Configuration
+uvicorn main:app --reload
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### Frontend
+```bash
+cd aidiCapstoneProject/tasigroup
+npm run dev
 
-### Deployment
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+The frontend will be available at `http://localhost:5173` and the backend API at `http://localhost:8000`.
 
-### `npm run build` fails to minify
+## API Endpoints
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
->>>>>>> 68bb8cf (Initial commit)
+### Authentication
+- `POST /signup/` - User registration
+- `POST /login/` - User authentication
+- `GET /protected/` - Protected route example
+
+### Content Generation
+- `POST /chat/` - Chat with EVA
+- `POST /generate_document/` - Generate Word document
+- `POST /reset_conversation` - Reset conversation history
+
+## Frontend Features
+
+- Modern and responsive UI with Tailwind CSS
+- Real-time chat interface
+- Document preview and download
+- Markdown support for content display
+- User authentication flow
+- Conversation history management
+- Error handling and loading states
+
+## Security Features
+
+- Password hashing using bcrypt
+- JWT token authentication
+- CORS protection
+- Environment variable management
+- Secure API key handling
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For support, please open an issue in the repository or contact the development team.
+
+## Acknowledgments
+
+- Groq for providing the AI model
+- FastAPI for the web framework
+- Supabase for authentication services
+- React and Vite for the frontend framework
