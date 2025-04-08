@@ -17,7 +17,7 @@ const SignUp = () => {
     setSuccess('');
 
     try {
-      const response = await axios.post('http://localhost:8000/signup/', {
+      const response = await axios.post('http://localhost:8080/signup/', {
         name,
         email,
         password,

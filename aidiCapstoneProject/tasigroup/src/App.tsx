@@ -18,6 +18,8 @@ import HowEVAWorks from './pages/HowEVAWorks';
 import Pricing from './pages/Pricing';
 import PromptLibrary from './pages/PromptLibrary';
 import ReportCard from './pages/ReportCard';
+import CheckoutPage from "./pages/CheckoutPage";
+import PaymentSuccess from "./pages/PaymentSuccess";
 
 // Custom hook for authentication status
 const useAuth = () => {
@@ -73,6 +75,8 @@ const App = () => {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/prompt-library" element={<PromptLibrary />} />
           <Route path="/report-card" element={<ReportCard />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/payment-success" element={<PaymentSuccess />} />
 
           {/* Protected Routes */}
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

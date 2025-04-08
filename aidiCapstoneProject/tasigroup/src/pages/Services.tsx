@@ -1,4 +1,3 @@
-import React from 'react';
 import { Lightbulb, BookOpen, Users, PenTool, Brain, Rocket } from 'lucide-react';
 
 const Services = () => {

@@ -28,6 +28,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import create_client, Client
 from markdown import markdown
 from pydantic import BaseModel
+import stripe
+
+
 
 class UserIdRequest(BaseModel):
     user_id: str
@@ -43,6 +46,8 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Password Hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# stripe key
+stripe.api_key = "sk_test_51RAFGMLGXU8BfuvFJvhqglbARsPIcDsHdkqb4Ft6U8IhFD9rR88ysMYRbfO8bB9QHwyD6PMQvLX5gCoYb1bNqXpg006iz6uAdO"
 
 # Configuration using environment variables
 class Settings(BaseModel):
@@ -76,7 +81,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
+    expose_headers=["*"],
 
 )
 
@@ -286,6 +291,177 @@ async def reset_conversation(request: UserIdRequest):
         logging.error(f"Reset error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# # payment integration
+@app.post("/upgrade-plan/")
+async def upgrade_plan(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        token = credentials.credentials
+        auth_user = supabase.auth.get_user(token)
+        user_id = auth_user.user.id
+
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{'price': 'price_12345', 'quantity': 1}],
+            mode='subscription',
+            success_url=f"{os.getenv('FRONTEND_URL')}/payment-success",
+            cancel_url=f"{os.getenv('FRONTEND_URL')}/pricing",
+            metadata={"user_id": user_id}
+        )
+
+        return {"url": checkout_session.url}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/user-plan")
+async def get_user_plan(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        # Verify token
+        user = supabase.auth.get_user(credentials.credentials)
+        if not user.user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Fetch user data
+        data = supabase.from_("users") \
+            .select("plan_type, responses_generated") \
+            .eq("id", user.user.id) \
+            .execute()
+
+        if not data.data:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return data.data[0]
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+# Payment endpoints
+@app.post("/create-checkout-session/")
+async def create_checkout_session(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    try:
+        # 1. Authenticate user
+        token = credentials.credentials
+        auth_response = supabase.auth.get_user(token)
+        user = auth_response.user
+
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid authentication")
+
+        user_id = user.id
+
+        # 2. Get user email from database
+        user_query = supabase.from_("users").select("email").eq("id", user_id).execute()
+        if not user_query.data or len(user_query.data) == 0:
+            raise HTTPException(status_code=404, detail="User not found in database")
+
+        user_email = user_query.data[0]["email"]
+
+        # 3. Create Stripe Checkout Session
+        price_id = os.getenv("STRIPE_PRO_PRICE_ID")
+        if not price_id:
+            raise HTTPException(status_code=500, detail="Stripe price ID is not configured.")
+
+        try:
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price': price_id,
+                    'quantity': 1,
+                }],
+                mode='subscription',
+                customer_email=user_email,
+                metadata={
+                    "user_id": user_id,
+                    "plan": "pro"
+                },
+                success_url="http://localhost:5173/payment-success?session_id={CHECKOUT_SESSION_ID}",
+                cancel_url="http://localhost:5173/pricing",
+            )
+        except stripe.error.StripeError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+        return {"url": checkout_session.url}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    except HTTPException:
+        raise  # Re-raise known exceptions
+    except stripe.error.StripeError as e:
+        logging.error(f"Stripe error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e.user_message))
+    except Exception as e:
+        logging.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/create-payment-intent/")
+async def create_payment_intent(request: Request):
+    data = await request.json()
+
+    intent = stripe.PaymentIntent.create(
+        amount=1500,  # $15.00
+        currency='usd',
+        metadata={
+            'plan': data['plan'],
+            'user_id': request.user.id
+        }
+    )
+
+    return {'clientSecret': intent.client_secret}
+
+
+@app.get("/verify-payment")
+async def verify_payment(session_id: str):
+    session = stripe.checkout.Session.retrieve(session_id)
+    if session.payment_status == "paid":
+        # Get user ID from session metadata
+        user_id = session.metadata.get("user_id")
+
+        # Return fresh plan data
+        user_data = supabase.from_("users") \
+            .select("plan_type, responses_generated") \
+            .eq("id", user_id) \
+            .execute()
+
+        return {
+            "status": "success",
+            "plan_type": user_data.data[0]["plan_type"],
+            "responses_generated": user_data.data[0]["responses_generated"]
+        }
+    return {"status": "pending"}
+
+# Webhook handler (improved)
+@app.post("/stripe-webhook")
+async def handle_stripe_webhook(request: Request):
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload,
+            sig_header,
+            os.getenv("STRIPE_WEBHOOK_SECRET")
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    except stripe.error.SignatureVerificationError as e:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    if event.type == "checkout.session.completed":
+        session = event.data.object
+        user_id = session.metadata.get("user_id")
+
+        # Update Supabase
+        update_response = supabase.table("users") \
+            .update({"plan_type": "pro"}) \
+            .eq("id", user_id) \
+            .execute()
+
+        if not update_response.data:
+            raise HTTPException(status_code=400, detail="Failed to update user plan")
+
+    return {"status": "success"}
 @app.post("/login/")
 async def login(user: UserLogin):
     try:
@@ -328,16 +504,38 @@ async def protected_route(credentials: HTTPAuthorizationCredentials = Depends(se
 
 
 @app.post("/chat/")
-async def chat(query: Query):
-    user_question = query.question
-    user_id = query.user_id
-
-    if not user_question:
-        raise HTTPException(status_code=400, detail="Question must not be empty")
-
+async def chat(query: Query, credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
-        # Check if this is a brand new conversation
-        state_data = supabase.table("conversation_states").select("*").eq("user_id", user_id).execute()
+        # Verify authentication
+        token = credentials.credentials
+        auth_user = supabase.auth.get_user(token)
+        user_id = auth_user.user.id
+
+        # Fetch user data with plan info
+        user_data = supabase.table("users") \
+            .select("plan_type, responses_generated") \
+            .eq("id", user_id) \
+            .execute()
+
+        if not user_data.data:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user = user_data.data[0]
+        question = query.question
+
+        # Check free user limits
+        if user["plan_type"] == "free" and user["responses_generated"] >= 2:
+            raise HTTPException(
+                status_code=403,
+                detail="Free plan limit reached. Upgrade to continue chatting."
+            )
+
+        # Get conversation state
+        state_data = supabase.table("conversation_states") \
+            .select("*") \
+            .eq("user_id", user_id) \
+            .execute()
+
         is_new_conversation = not state_data.data or state_data.data[0]["conversation_turns"] == 0
 
         # Get or create session
@@ -352,7 +550,7 @@ async def chat(query: Query):
             current_session = {
                 "id": str(uuid4()),
                 "user_id": user_id,
-                "title": user_question[:50],
+                "title": question[:50],
                 "created_at": datetime.utcnow().isoformat(),
             }
             supabase.table("chat_sessions").insert([current_session]).execute()
@@ -363,20 +561,18 @@ async def chat(query: Query):
         supabase.table("chat_messages").insert([{
             "session_id": current_session["id"],
             "sender": "user",
-            "text": user_question,
+            "text": question,
             "timestamp": datetime.utcnow().isoformat(),
         }]).execute()
 
         # Generate response
         if is_new_conversation:
-            # Start fresh with just the system prompt
-            response = conversation.run(human_input=user_question)
+            response = conversation.run(human_input=question)
         else:
-            # Continue existing conversation
             MAX_HISTORY_LENGTH = 5
             history = state_data.data[0]["conversation_data"][-MAX_HISTORY_LENGTH:]
             combined_input = " ".join([qa["response"] for qa in history])
-            response = conversation.run(human_input=combined_input + "\n" + user_question)
+            response = conversation.run(human_input=combined_input + "\n" + question)
 
         # Save bot response
         supabase.table("chat_messages").insert([{
@@ -391,29 +587,39 @@ async def chat(query: Query):
             supabase.table("conversation_states").insert([{
                 "user_id": user_id,
                 "conversation_turns": 1,
-                "conversation_data": [{"response": user_question}],
+                "conversation_data": [{"response": question}],
             }]).execute()
         else:
             updated_state = {
                 "conversation_turns": state_data.data[0]["conversation_turns"] + 1,
-                "conversation_data": state_data.data[0]["conversation_data"] + [{"response": user_question}],
+                "conversation_data": state_data.data[0]["conversation_data"] + [{"response": question}],
             }
             supabase.table("conversation_states") \
                 .update(updated_state) \
                 .eq("user_id", user_id) \
                 .execute()
 
+        # Increment response count for free users
+        if user["plan_type"] == "free":
+            supabase.table("users") \
+                .update({"responses_generated": user["responses_generated"] + 1}) \
+                .eq("id", user_id) \
+                .execute()
+
         html_response = markdown(response)
         return {
             "response": html_response,
             "raw_response": response,
-            "status": "success",
+            "remaining_responses": max(0, 2 - (user["responses_generated"] + 1)) if user[
+                                                                                        "plan_type"] == "free" else "unlimited",
             "is_new_conversation": is_new_conversation
         }
 
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        logging.error(f"Error during chat processing: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        logging.error(f"Chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 # Document Generation Endpoint
 @app.post("/generate_document/")

@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Send, Download, Sparkles, Bot, User, FileSpreadsheet, Brain, BookOpen } from "lucide-react";
+import { Send, Download, Sparkles, Bot, User, FileSpreadsheet, Brain, BookOpen, X } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Document, Paragraph, TextRun, HeadingLevel, Packer } from "docx";
-
+import {useNavigate} from "react-router-dom";
 interface Message {
   sender: string;
   text: string;
@@ -39,6 +39,9 @@ const ChatRoom: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [userId, setUserId] = useState<string>("");
+  const [userPlan, setUserPlan] = useState<{type: string; responses: number}>({type: 'free', responses: 0});
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const nagivate = useNavigate()
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -108,6 +111,36 @@ const ChatRoom: React.FC = () => {
         setUserId(storedUserId);
       }
     }
+   const fetchUserPlan = async () => {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    console.error("No token found");
+    return;
+  }
+
+  try {
+    const response = await fetch("http://localhost:8080/user-plan", {
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      credentials: "include" // Required for cookies
+    });
+
+    if (response.status === 403) {
+      // Token expired - force re-login
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+      return;
+    }
+
+    const data = await response.json();
+    setUserPlan(data);
+  } catch (error) {
+    console.error("Plan check failed:", error);
+  }
+};
+    fetchUserPlan();
 
     const storedMessages = localStorage.getItem("chatMessages");
     if (storedMessages) {
@@ -127,51 +160,71 @@ const ChatRoom: React.FC = () => {
 
   const sendMessage = async (messageText: string) => {
     if (!messageText.trim()) return;
-  
+
+    // Check if free user has reached limitkkkkkk
+    if (userPlan.type === 'free' && userPlan.responses >= 2) {
+      setShowUpgradeModal(true);
+      // nagivate("/pricing");
+      return;
+    }
+
     const userMessage: Message = { sender: "user", text: messageText };
     setMessages((prev) => {
       const updatedMessages = [...prev, userMessage];
       localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
       return updatedMessages;
     });
-  
+
     setIsLoading(true);
-  
+
     try {
-      const response = await fetch("http://localhost:8000/chat/", {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:8080/chat/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
+          "Authorization": token ? `Bearer ${token}` : ""
         },
         body: JSON.stringify({ question: messageText, user_id: userId }),
       });
-  
+
+      if (response.status === 403) {
+        setShowUpgradeModal(true);
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-  
+
       const data = await response.json();
-      
-      // Strip all HTML tags
       const cleanText = data.response.replace(/<\/?[^>]+(>|$)/g, '');
-  
-      const botMessage: Message = { 
-        sender: "bot", 
+
+      const botMessage: Message = {
+        sender: "bot",
         text: cleanText,
-        isMarkdown: true 
+        isMarkdown: true
       };
-      
+
       setMessages((prev) => {
         const updatedMessages = [...prev, botMessage];
         localStorage.setItem("chatMessages", JSON.stringify(updatedMessages));
         return updatedMessages;
       });
+
+      // Update response count for free users
+    if (userPlan.type === 'free') {
+    setUserPlan(prev => ({
+      ...prev,
+      responses: prev.responses + 1
+    }));
+      }
     } catch (error) {
       console.error("Error sending message:", error);
-      const errorMessage: Message = { 
-        sender: "bot", 
-        text: "Error: Unable to get a response." 
+      const errorMessage: Message = {
+        sender: "bot",
+        text: "Error: Unable to get a response."
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -188,10 +241,11 @@ const ChatRoom: React.FC = () => {
   const handleNewChat = () => {
     setMessages([]);
     localStorage.removeItem("chatMessages");
-    fetch("http://localhost:8000/reset_conversation", {
+    fetch("http://localhost:8080/reset_conversation", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("token")}`
       },
       body: JSON.stringify({ user_id: userId }),
     }).catch((error) => console.error("Error resetting conversation:", error));
@@ -222,13 +276,58 @@ const ChatRoom: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen pt-20 pl-64 bg-gradient-to-r from-indigo-100 to-blue-50">
+    <div className="min-h-screen pt-20 pl-64 bg-gradient-to-r from-indigo-100 to-blue-50 relative">
+      {/* Upgrade Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 relative">
+            <button
+              onClick={() => setShowUpgradeModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+            >
+              <X size={20} />
+            </button>
+            <h3 className="text-xl font-bold mb-4">Upgrade Required</h3>
+            <p className="mb-6">You've used all {userPlan.responses}/2 free responses. Upgrade to Pro for unlimited access.</p>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg flex-1"
+              >
+                Continue Free
+              </button>
+              <button
+                onClick={() => nagivate("/pricing")}
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg flex-1"
+              >
+                Upgrade Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Response Counter */}
+    {userPlan.type === 'free' && (
+  <div className="fixed top-20 right-8 bg-white px-4 py-2 rounded-full shadow-md text-sm flex items-center z-10">
+    <span className="mr-2">Responses:</span>
+    <span className="font-semibold">
+      {userPlan.responses}/2
+    </span>
+  </div>
+)}
       <div className="max-w-6xl mx-auto p-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
           {features.map((feature, index) => (
             <button
               key={index}
-              onClick={feature.onClick}
+              onClick={() => {
+                if (userPlan.type === 'free' && userPlan.responses >= 2) {
+                  setShowUpgradeModal(true);
+                } else {
+                  feature.onClick();
+                }
+              }}
               className="group relative bg-white/80 backdrop-blur-md p-8 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 transform hover:scale-105"
             >
               <div
@@ -271,7 +370,7 @@ const ChatRoom: React.FC = () => {
                         <Bot className="w-6 h-6 text-white" />
                       </div>
                     </div>
-                    <button 
+                    <button
                       onClick={() => downloadAsDocx(msg.text)}
                       className="mt-1 p-1 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
                       title="Download as Word document"
@@ -366,19 +465,22 @@ const ChatRoom: React.FC = () => {
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Ask EVA anything about education..."
               className="w-full p-4 pr-12 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+              disabled={userPlan.type === 'free' && userPlan.responses >= 2}
             />
             <Sparkles className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
           </div>
           <div className="flex items-center space-x-3">
             <button
               type="submit"
-              className="p-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="p-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+              disabled={userPlan.type === 'free' && userPlan.responses >= 2}
             >
               <Send className="h-5 w-5" />
             </button>
             <button
               type="button"
               className="p-4 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+              onClick={() => downloadAsDocx(messages.map(m => `${m.sender}: ${m.text}`).join('\n\n'))}
             >
               <Download className="h-5 w-5" />
             </button>

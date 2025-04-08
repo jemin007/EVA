@@ -1,4 +1,3 @@
-import React from 'react';
 import { Share2, Twitter, Facebook, Linkedin, Mail, Link as LinkIcon } from 'lucide-react';
 
 const Share = () => {
