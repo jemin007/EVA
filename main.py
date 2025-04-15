@@ -84,7 +84,7 @@ app.add_middleware(
 )
 
 # Initialize Groq client
-model = 'llama-3.2-90b-vision-preview'
+model = 'llama-3.3-70b-versatile'
 groq_chat = ChatGroq(
     groq_api_key=settings.groq_api_key,
     model_name=model,
